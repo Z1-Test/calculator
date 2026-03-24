@@ -1,0 +1,14 @@
+{
+  "name": "@z1-test/calculator",
+  "version": "1.0.0",
+  "description": "Simple calculator for testing caching",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:publish": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
