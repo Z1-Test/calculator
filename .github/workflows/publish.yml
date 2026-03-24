@@ -35,7 +35,7 @@ jobs:
           version: "0.20.0"
           verb: call
           # Use our main branch module for testing
-          module: github.com/StaytunedLLP/devops/src@main
+          module: github.com/StaytunedLLP/devops/src@feature/deterministic-publishing-6689115550996667647
           args: >
             publish-package
             --source=.
