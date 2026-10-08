@@ -103,6 +103,13 @@ export class ThemeManager {
 
   private readStorageMode(): ThemeMode {
     try {
+      if (typeof window !== 'undefined' && window.location?.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const themeParam = urlParams.get('theme');
+        if (themeParam === 'light' || themeParam === 'dark' || themeParam === 'system') {
+          return themeParam;
+        }
+      }
       if (typeof localStorage !== 'undefined') {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
         if (stored === 'light' || stored === 'dark' || stored === 'system') {

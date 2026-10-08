@@ -42,6 +42,15 @@ export class StayCalcApp extends HTMLElement {
     this.render();
     this.bindSubcomponents();
     this.setupListeners();
+
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const initialInput = params.get('input');
+      const initialExp = params.get('expr');
+      if (initialInput) this.currentInput = initialInput;
+      if (initialExp) this.currentExpression = initialExp;
+      this.syncDisplay();
+    }
   }
 
   private bindSubcomponents(): void {
