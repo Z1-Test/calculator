@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@staytunedllp/staystack": "1.11.47"
+  },
   "devDependencies": {
     "happy-dom": "^17.4.2",
     "typescript": "^5.8.2",
