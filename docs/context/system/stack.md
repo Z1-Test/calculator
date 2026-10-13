@@ -24,7 +24,7 @@ sources:
 | **Offline & PWA** | Service Worker API + Web App Manifest | Cache-first offline execution with installability. |
 | **Local Storage** | `localStorage` / `IndexedDB` | Low-latency client persistence for calculation history and preferences. |
 | **Build & Tooling** | Native ES Modules & TypeScript | Lightweight standard development without external framework lock-in. |
-| **Test Runner** | Node.js Test Runner (`node --test`) | Fast, native unit testing built directly into Node.js runtime. |
+| **Test Runner** | Automated Test Suite (`npm test`) | Fast, native unit testing without external test framework lock-in. |
 
 ## 2. Dependency Invariants
 
