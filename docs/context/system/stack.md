@@ -23,8 +23,8 @@ sources:
 | **Compute Engine** | Web Worker API | Offloads mathematical evaluation and parsing off the main UI thread. |
 | **Offline & PWA** | Service Worker API + Web App Manifest | Cache-first offline execution with installability. |
 | **Local Storage** | `localStorage` / `IndexedDB` | Low-latency client persistence for calculation history and preferences. |
-| **Build & Bundle** | Vite / Native ESBuild | Instant HMR and lightweight optimized tree-shaken static output. |
-| **Test Runner** | Node.js Test Runner / Vitest | Fast, native unit testing of arithmetic parsing and edge cases. |
+| **Build & Tooling** | Native ES Modules & TypeScript | Lightweight standard development without external framework lock-in. |
+| **Test Runner** | Node.js Test Runner (`node --test`) | Fast, native unit testing built directly into Node.js runtime. |
 
 ## 2. Dependency Invariants
 
