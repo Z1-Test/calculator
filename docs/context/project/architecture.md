@@ -15,50 +15,44 @@ sources:
 
 ## 1. System Topology
 
-StayCalc operates as a fully client-side Progressive Web Application (PWA) with componentized W3C Custom Elements and an isolated Web Worker calculation engine:
+StayCalc operates as a client-side web application anchored on a native W3C Autonomous Custom Element (`<stay-calc>`) with Declarative Shadow DOM (DSD) slot projections and a pure native arithmetic engine:
 
 ```mermaid
 flowchart TD
-  subgraph BrowserUI ["Browser UI Thread (W3C Custom Elements + DSD)"]
-    Shell["<stay-calc-app> (Application Shell)"]
-    Header["<stay-calc-header> (Mode & Theme Controls)"]
-    Display["<stay-calc-display> (Expression & Result with ARIA Live)"]
-    Keypad["<stay-calc-keypad> (Standard / Scientific / Programmer Keyboards)"]
-    HistoryDrawer["<stay-calc-history> (Calculation Tape Overlay)"]
+  subgraph UI ["Custom Element Layer (W3C Custom Element + DSD)"]
+    StayCalc["<stay-calc> (Root Element)"]
+    DisplaySlot["Display (Input Buffer & Result)"]
+    KeypadSlot["Keypad (Numeric & Operator Triggers)"]
+    HistoryDrawer["History Drawer (Calculation Tape)"]
   end
 
-  subgraph StateService ["Local State & Storage Service"]
-    StateStore["State Coordinator (Session State, Memory Registers)"]
-    LocalStorageAdapter["Local Storage / IndexedDB Adapter"]
+  subgraph Engine ["Core Logic & State Engine"]
+    MathEngine["Precision Math Engine (Decimals & Errors)"]
+    MemoryReg["Memory Registers (M+, M-, MR, MC)"]
+    HistoryStore["History Store (Audit Tape)"]
   end
 
-  subgraph WorkerThread ["Computation Engine (Web Worker)"]
-    CalcWorker["Calculation Worker (Tokenize, Shunting-Yard, BigInt Bitwise)"]
-  end
+  StayCalc --> DisplaySlot
+  StayCalc --> KeypadSlot
+  StayCalc --> HistoryDrawer
 
-  Shell --> Header
-  Shell --> Display
-  Shell --> Keypad
-  Shell --> HistoryDrawer
-
-  Keypad -->|Input Events| StateStore
-  StateStore -->|Evaluate Request| CalcWorker
-  CalcWorker -->|Computed Result / Error| StateStore
-  StateStore -->|Update Display & Tape| Shell
-  StateStore -->|Persist History & Theme| LocalStorageAdapter
+  KeypadSlot -->|Keypress or Tap| MathEngine
+  MathEngine -->|Result or Error| DisplaySlot
+  MathEngine -->|Evaluation Record| HistoryStore
+  KeypadSlot -->|Memory Key| MemoryReg
+  MemoryReg -->|Active State| StayCalc
 ```
 
 ## 2. Component Boundaries
 
-1. **`<stay-calc-app>`**: Top-level host element managing global keyboard events, active mode routing (`standard`, `scientific`, `programmer`), and theme binding (`light`, `dark`).
-2. **`<stay-calc-header>`**: Navigation bar displaying the brand mark, calculation mode selector pills, history toggle button, and theme switch toggle.
-3. **`<stay-calc-display>`**: High-contrast, dynamic text display rendering active expression buffer, current evaluation result, memory indicators (`M`), and accessible `aria-live="polite"` announcements.
-4. **`<stay-calc-keypad>`**: Responsive grid container projecting standard numeric buttons, operational action triggers (`+`, `-`, `×`, `÷`, `=`), scientific function keys (`sin`, `cos`, `log`, `π`, `^`), and programmer radix/bitwise buttons (`AND`, `OR`, `XOR`, `HEX`, `BIN`).
-5. **`<stay-calc-history>`**: Slide-over drawer presenting chronologically recorded calculation entries with one-click reload into the active display buffer.
+1. **`<stay-calc>`**: The top-level autonomous custom element managing the keyboard event listeners, visual display slot, keypad slot, and history drawer overlay.
+2. **Precision Math Engine**: Pure, zero-dependency arithmetic module responsible for immediate evaluation, operator replacement (`5 + * 2` $\to$ `5 * 2`), division-by-zero protection, and floating-point error mitigation (`0.1 + 0.2` = `0.3`).
+3. **Memory Coordinator**: State register managing `M+`, `M-`, `MR`, and `MC` operations, reflecting an active `M` badge on the display whenever memory $\ne 0$.
+4. **History Tape**: Local storage store retaining past calculation records (`<operand1> <op> <operand2> = <result>`) with click-to-load capability.
 
 ## 3. Data Flow & Evaluation Lifecycle
 
-- **Input Ingestion**: Button taps and hardware keyboard strokes are normalized into atomic tokens (`NUMBER`, `OPERATOR`, `FUNCTION`, `CONTROL`).
-- **Calculation Execution**: Expressions are parsed using a deterministic tokenizer and operator-precedence parser (Shunting-Yard algorithm) inside a dedicated Web Worker to ensure zero UI jank.
-- **Precision Normalization**: Decimal floating-point arithmetic is normalized using scaled integer math / epsilon correction to prevent binary approximation artifacts.
-- **Persistence**: Successful evaluations are prepended to the local storage history tape and capped at 100 entries.
+- **Input Ingestion**: Button taps and physical keyboard events (`0-9`, `+`, `-`, `*`, `/`, `Enter`, `Escape`, `Backspace`) are captured by `<stay-calc>`.
+- **Immediate Evaluation**: Operations execute sequentially (pocket calculator model: `2 + 3 * 4 = 20`).
+- **Precision Normalization**: Decimal calculations are normalized to prevent IEEE 754 precision leakage.
+- **Persistence**: Completed calculations are prepended to the local history tape.

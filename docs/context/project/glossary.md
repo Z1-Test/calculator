@@ -25,4 +25,4 @@ sources:
 - **History Tape**: A chronological, reverse-ordered log of completed calculations stored in local browser storage.
 - **Radix**: The base of a positional numeral system (Base 16 = HEX, Base 10 = DEC, Base 8 = OCT, Base 2 = BIN).
 - **DSD (Declarative Shadow DOM)**: Web platform standard enabling native encapsulation of Web Components without requiring JavaScript SSR hydration.
-- **Staylook Tokens**: Standardized CSS custom property design system (`sl-*`) specifying colors, radii, spacing, and typography across themes.
+- **Semantic Design Tokens**: Standardized CSS custom properties specifying colors, radii, spacing, and typography across themes.

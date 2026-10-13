@@ -13,7 +13,7 @@ sources:
 
 # StayCalc Documentation
 
-> High-precision, multi-mode offline-first PWA web calculator built with W3C Custom Elements and Staystack architecture.
+> High-precision, multi-mode offline-first PWA web calculator built with native W3C Custom Elements, Declarative Shadow DOM (DSD), and pure native Web Standards.
 
 ## Overview
 
@@ -39,13 +39,13 @@ docs/context/
   - [Entity Statuses](./project/entity-statuses.md): Calculator state machines and mode lifecycles.
   - [Data Retention](./project/data-retention.md): Local storage lifecycle and privacy policies.
   - [Brand Guidelines](./project/brand.md): Brand voice, logo rules, and core palette.
-  - [Design System](./project/design.md): Staylook design tokens, typography, and component recipes.
+  - [Design System](./project/design.md): Semantic design tokens, typography, and component recipes.
 
 - **System Specifications** (`system/`):
   - [Start Here](./system/start-here.md): Developer quick-start guide and setup steps.
   - [Technology Stack](./system/stack.md): Platform runtimes, zero-dependency requirements, and PWA configuration.
   - [Routes & Surfaces](./system/routes.md): URL parameters, mode transitions, and view states.
-  - [API & Interfaces](./system/api.md): Client-side Web Worker calculation contracts.
+  - [API & Interfaces](./system/api.md): Component and calculation engine contracts.
   - [Data Model](./system/data.md): Local storage schemas and history persistence structures.
   - [System Constraints](./system/constraints.md): WCAG 2.2 AA accessibility, performance budgets, and error boundaries.
 

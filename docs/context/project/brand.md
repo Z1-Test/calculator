@@ -40,7 +40,7 @@ brand_colors:
 - **Prohibitions**: Never rotate, skew, recolor, or add drop shadows to the logo.
 
 ## 4. Core Brand Palette & Values
-Palette values live only in the `brand_colors` YAML frontmatter above. Do not copy them into a markdown table. `stayplan-brand` sync writes each mapped key into `docs/context/project/design.md` as an `sl-*` color with Staylook syntax `var(--sl-*, <hex>)`. `primary_active`, `accent`, and the `*_dark` keys stay in this frontmatter.
+Palette values live only in the `brand_colors` YAML frontmatter above. Do not copy them into a markdown table. Mapped keys sync into `docs/context/project/design.md` as semantic colors with CSS custom property syntax `var(--calc-*, <hex>)`. `primary_active`, `accent`, and the `*_dark` keys stay in this frontmatter.
 
 ## 5. Imagery & Asset Direction
 - Crisp SVG vector iconography with consistent 2px stroke width.
