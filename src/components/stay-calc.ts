@@ -3,6 +3,7 @@ import { MemoryStore } from '../engine/memory-store.ts';
 import { HistoryStore } from '../engine/history-store.ts';
 import { ScientificEngine } from '../engine/scientific-engine.ts';
 import { ProgrammerEngine } from '../engine/programmer-engine.ts';
+import { HistoryExportService } from '../services/history-export.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
@@ -124,6 +125,20 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     if (this.progPanelElement) {
       this.progPanelElement.style.display = this.isProgrammerOpen ? 'flex' : 'none';
     }
+  }
+
+  public exportTapeText(): string {
+    return HistoryExportService.formatAsText(this.history.getEntries());
+  }
+
+  public exportTapeJson(): string {
+    return HistoryExportService.formatAsJson(this.history.getEntries());
+  }
+
+  public async copyTape(): Promise<string> {
+    const text = this.exportTapeText();
+    await HistoryExportService.copyToClipboard(text);
+    return text;
   }
 
   public updateDisplay(): void {
@@ -348,6 +363,22 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           color: var(--calc-text-secondary);
         }
 
+        .history-actions {
+          display: flex;
+          gap: 6px;
+          align-items: center;
+        }
+
+        .history-action-btn {
+          background: var(--calc-surface-mem);
+          border: 1px solid var(--calc-border);
+          color: var(--calc-text-secondary);
+          border-radius: 6px;
+          font-size: 11px;
+          padding: 2px 6px;
+          cursor: pointer;
+        }
+
         .history-clear-btn {
           background: none;
           border: none;
@@ -547,7 +578,11 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         <div id="history-drawer" class="history-drawer" part="history-drawer">
           <div class="history-header">
             <span>Calculation Tape</span>
-            <button type="button" id="btn-clear-history" class="history-clear-btn" aria-label="Clear calculation history">Clear</button>
+            <div class="history-actions">
+              <button type="button" id="btn-copy-history" class="history-action-btn" aria-label="Copy calculation tape">📋 Copy</button>
+              <button type="button" id="btn-export-json" class="history-action-btn" aria-label="Export tape as JSON">💾 JSON</button>
+              <button type="button" id="btn-clear-history" class="history-clear-btn" aria-label="Clear calculation history">Clear</button>
+            </div>
           </div>
           <div id="history-records">
             <div class="history-empty" id="history-empty">No calculations yet</div>
@@ -629,6 +664,21 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
       clearHistBtn.addEventListener('click', () => {
         this.history.clear();
         this.updateHistoryList();
+      });
+    }
+
+    const copyHistBtn = this.shadowRootRef.getElementById('btn-copy-history');
+    if (copyHistBtn) {
+      copyHistBtn.addEventListener('click', () => {
+        this.copyTape();
+      });
+    }
+
+    const exportJsonBtn = this.shadowRootRef.getElementById('btn-export-json');
+    if (exportJsonBtn) {
+      exportJsonBtn.addEventListener('click', () => {
+        const json = this.exportTapeJson();
+        this.dispatchEvent(new CustomEvent('tape-export', { detail: { format: 'json', payload: json } }));
       });
     }
 
