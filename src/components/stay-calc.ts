@@ -2,19 +2,23 @@ import { CalcEngine, formatDisplay } from '../engine/calc-engine.ts';
 import { MemoryStore } from '../engine/memory-store.ts';
 import { HistoryStore } from '../engine/history-store.ts';
 import { ScientificEngine } from '../engine/scientific-engine.ts';
+import { ProgrammerEngine } from '../engine/programmer-engine.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
   public memory: MemoryStore;
   public history: HistoryStore;
   public scientific: ScientificEngine;
+  public programmer: ProgrammerEngine;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
   private drawerElement: HTMLElement | null = null;
   private sciPanelElement: HTMLElement | null = null;
+  private progPanelElement: HTMLElement | null = null;
   private isHistoryOpen: boolean = false;
   private isScientificOpen: boolean = false;
+  private isProgrammerOpen: boolean = false;
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
   constructor() {
@@ -23,6 +27,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.memory = new MemoryStore();
     this.history = new HistoryStore();
     this.scientific = new ScientificEngine();
+    this.programmer = new ProgrammerEngine();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -114,12 +119,34 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     }
   }
 
+  public toggleProgrammer(): void {
+    this.isProgrammerOpen = !this.isProgrammerOpen;
+    if (this.progPanelElement) {
+      this.progPanelElement.style.display = this.isProgrammerOpen ? 'flex' : 'none';
+    }
+  }
+
   public updateDisplay(): void {
+    const currentVal = this.engine.getState().display;
     if (this.displayElement) {
-      this.displayElement.textContent = this.engine.getState().display;
+      this.displayElement.textContent = currentVal;
     }
     if (this.badgeElement) {
       this.badgeElement.style.display = this.memory.hasMemory() ? 'inline-block' : 'none';
+    }
+
+    // Update programmer radix strips
+    if (this.shadowRootRef) {
+      this.programmer.setValue(currentVal);
+      const rep = this.programmer.getRepresentations();
+      const hexEl = this.shadowRootRef.getElementById('prog-hex');
+      const decEl = this.shadowRootRef.getElementById('prog-dec');
+      const octEl = this.shadowRootRef.getElementById('prog-oct');
+      const binEl = this.shadowRootRef.getElementById('prog-bin');
+      if (hexEl) hexEl.textContent = rep.HEX;
+      if (decEl) decEl.textContent = rep.DEC;
+      if (octEl) octEl.textContent = rep.OCT;
+      if (binEl) binEl.textContent = rep.BIN;
     }
   }
 
@@ -161,6 +188,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           --calc-surface-op: #e4e4e7;
           --calc-surface-mem: #f1f5f9;
           --calc-surface-sci: #e0e7ff;
+          --calc-surface-prog: #f8fafc;
           --calc-text-primary: #09090b;
           --calc-text-secondary: #64748b;
           --calc-border: #e4e4e7;
@@ -220,7 +248,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
         .meta-actions {
           display: flex;
-          gap: 8px;
+          gap: 6px;
         }
 
         .history-toggle-btn {
@@ -248,6 +276,54 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           white-space: nowrap;
           font-variant-numeric: tabular-nums;
           line-height: 1.2;
+        }
+
+        .programmer-panel {
+          display: none;
+          flex-direction: column;
+          gap: 8px;
+          background: var(--calc-surface-prog);
+          border: 1px solid var(--calc-border);
+          border-radius: 16px;
+          padding: 12px;
+          font-size: 12px;
+        }
+
+        .radix-strips {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          font-family: monospace;
+        }
+
+        .radix-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 2px 6px;
+          border-radius: 4px;
+          background: #ffffff;
+          border: 1px solid #f1f5f9;
+        }
+
+        .radix-label {
+          font-weight: 700;
+          color: var(--calc-text-secondary);
+        }
+
+        .prog-actions {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 4px;
+        }
+
+        button.prog-btn {
+          background: #ffffff;
+          border: 1px solid var(--calc-border);
+          border-radius: 6px;
+          height: 32px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
         }
 
         .history-drawer {
@@ -430,12 +506,30 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
               <button type="button" id="btn-angle-mode" class="history-toggle-btn" aria-label="Toggle angle unit">${this.scientific.getAngleMode()}</button>
             </div>
             <div class="meta-actions">
+              <button type="button" id="btn-toggle-prog" class="history-toggle-btn" aria-label="Toggle programmer keypad">💻 Prog</button>
               <button type="button" id="btn-toggle-sci" class="history-toggle-btn" aria-label="Toggle scientific keypad">🔬 Sci</button>
               <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
             </div>
           </div>
           <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
             ${this.engine.getState().display}
+          </div>
+        </div>
+
+        <div id="programmer-panel" class="programmer-panel" part="programmer-panel">
+          <div class="radix-strips">
+            <div class="radix-row"><span class="radix-label">HEX</span><span id="prog-hex">0</span></div>
+            <div class="radix-row"><span class="radix-label">DEC</span><span id="prog-dec">0</span></div>
+            <div class="radix-row"><span class="radix-label">OCT</span><span id="prog-oct">0</span></div>
+            <div class="radix-row"><span class="radix-label">BIN</span><span id="prog-bin">0</span></div>
+          </div>
+          <div class="prog-actions" role="group" aria-label="Bitwise operations">
+            <button type="button" class="prog-btn" data-prog="AND">AND</button>
+            <button type="button" class="prog-btn" data-prog="OR">OR</button>
+            <button type="button" class="prog-btn" data-prog="XOR">XOR</button>
+            <button type="button" class="prog-btn" data-prog="NOT">NOT</button>
+            <button type="button" class="prog-btn" data-prog="LSH">LSH</button>
+            <button type="button" class="prog-btn" data-prog="RSH">RSH</button>
           </div>
         </div>
 
@@ -504,6 +598,8 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     if (this.drawerElement) this.drawerElement.style.display = 'none';
     this.sciPanelElement = this.shadowRootRef.getElementById('scientific-panel') as HTMLElement;
     if (this.sciPanelElement) this.sciPanelElement.style.display = 'none';
+    this.progPanelElement = this.shadowRootRef.getElementById('programmer-panel') as HTMLElement;
+    if (this.progPanelElement) this.progPanelElement.style.display = 'none';
 
     const toggleBtn = this.shadowRootRef.getElementById('btn-toggle-history');
     if (toggleBtn) {
@@ -513,6 +609,11 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     const toggleSciBtn = this.shadowRootRef.getElementById('btn-toggle-sci');
     if (toggleSciBtn) {
       toggleSciBtn.addEventListener('click', () => this.toggleScientific());
+    }
+
+    const toggleProgBtn = this.shadowRootRef.getElementById('btn-toggle-prog');
+    if (toggleProgBtn) {
+      toggleProgBtn.addEventListener('click', () => this.toggleProgrammer());
     }
 
     const angleBtn = this.shadowRootRef.getElementById('btn-angle-mode');
@@ -538,6 +639,20 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         if (item) {
           const res = item.getAttribute('data-result');
           if (res) this.loadHistoryRecord(res);
+        }
+      });
+    }
+
+    const progPanel = this.shadowRootRef.getElementById('programmer-panel');
+    if (progPanel) {
+      progPanel.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        const op = btn.getAttribute('data-prog');
+        if (op === 'NOT') {
+          this.programmer.bitwiseNot();
+          this.engine.setDisplayValue(this.programmer.getValue().toString());
+          this.updateDisplay();
         }
       });
     }
