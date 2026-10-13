@@ -1,18 +1,23 @@
 import { CalcEngine, formatDisplay } from '../engine/calc-engine.ts';
 import { MemoryStore } from '../engine/memory-store.ts';
+import { HistoryStore } from '../engine/history-store.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
   public memory: MemoryStore;
+  public history: HistoryStore;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
+  private drawerElement: HTMLElement | null = null;
+  private isHistoryOpen: boolean = false;
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
   constructor() {
     super();
     this.engine = new CalcEngine();
     this.memory = new MemoryStore();
+    this.history = new HistoryStore();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -54,8 +59,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
       this.updateDisplay();
       event.preventDefault();
     } else if (key === 'Enter' || key === '=') {
-      this.engine.calculate();
-      this.updateDisplay();
+      this.triggerCalculate();
       event.preventDefault();
     } else if (key === 'Escape') {
       this.engine.allClear();
@@ -77,6 +81,27 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     }
   }
 
+  public triggerCalculate(): void {
+    const state = this.engine.calculate();
+    if (state.lastExpression && !state.hasError) {
+      this.history.addEntry(state.lastExpression, state.display);
+    }
+    this.updateDisplay();
+    this.updateHistoryList();
+  }
+
+  public loadHistoryRecord(result: string): void {
+    this.engine.setDisplayValue(result);
+    this.updateDisplay();
+  }
+
+  public toggleHistory(): void {
+    this.isHistoryOpen = !this.isHistoryOpen;
+    if (this.drawerElement) {
+      this.drawerElement.style.display = this.isHistoryOpen ? 'block' : 'none';
+    }
+  }
+
   public updateDisplay(): void {
     if (this.displayElement) {
       this.displayElement.textContent = this.engine.getState().display;
@@ -84,6 +109,25 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     if (this.badgeElement) {
       this.badgeElement.style.display = this.memory.hasMemory() ? 'inline-block' : 'none';
     }
+  }
+
+  public updateHistoryList(): void {
+    if (!this.shadowRootRef) return;
+    const listContainer = this.shadowRootRef.getElementById('history-records');
+    if (!listContainer) return;
+
+    const entries = this.history.getEntries();
+    if (entries.length === 0) {
+      listContainer.innerHTML = '<div class="history-empty" id="history-empty">No calculations yet</div>';
+      return;
+    }
+
+    listContainer.innerHTML = entries.map(e => `
+      <div class="history-item" data-result="${e.result}" role="button" tabindex="0" aria-label="Load ${e.result}">
+        <span class="hist-expr">${e.expression}</span>
+        <span class="hist-res">= ${e.result}</span>
+      </div>
+    `).join('');
   }
 
   public render(): void {
@@ -140,9 +184,9 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
         .display-meta {
           display: flex;
-          justify-content: flex-start;
+          justify-content: space-between;
           align-items: center;
-          height: 20px;
+          height: 24px;
         }
 
         .memory-badge {
@@ -155,6 +199,21 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           display: none;
         }
 
+        .history-toggle-btn {
+          background: none;
+          border: none;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--calc-text-secondary);
+          cursor: pointer;
+          padding: 2px 6px;
+          border-radius: 6px;
+        }
+
+        .history-toggle-btn:focus-visible {
+          outline: 2px solid var(--calc-focus-ring);
+        }
+
         .display-card {
           text-align: right;
           font-size: 36px;
@@ -165,6 +224,61 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           white-space: nowrap;
           font-variant-numeric: tabular-nums;
           line-height: 1.2;
+        }
+
+        .history-drawer {
+          display: none;
+          background: #ffffff;
+          border: 1px solid var(--calc-border);
+          border-radius: 14px;
+          padding: 12px;
+          max-height: 160px;
+          overflow-y: auto;
+          font-size: 13px;
+        }
+
+        .history-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+          padding-bottom: 4px;
+          border-bottom: 1px solid var(--calc-border);
+          font-weight: 600;
+          color: var(--calc-text-secondary);
+        }
+
+        .history-clear-btn {
+          background: none;
+          border: none;
+          color: #dc2626;
+          font-size: 11px;
+          cursor: pointer;
+        }
+
+        .history-item {
+          display: flex;
+          justify-content: space-between;
+          padding: 6px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.1s ease;
+        }
+
+        .history-item:hover {
+          background-color: var(--calc-surface-mem);
+        }
+
+        .hist-res {
+          font-weight: 700;
+          color: var(--calc-primary);
+        }
+
+        .history-empty {
+          text-align: center;
+          color: var(--calc-text-secondary);
+          padding: 12px;
+          font-style: italic;
         }
 
         .memory-row {
@@ -255,9 +369,20 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         <div class="display-container" part="display-container">
           <div class="display-meta">
             <span id="memory-badge" class="memory-badge" part="memory-badge">M</span>
+            <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
           </div>
           <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
             ${this.engine.getState().display}
+          </div>
+        </div>
+
+        <div id="history-drawer" class="history-drawer" part="history-drawer">
+          <div class="history-header">
+            <span>Calculation Tape</span>
+            <button type="button" id="btn-clear-history" class="history-clear-btn" aria-label="Clear calculation history">Clear</button>
+          </div>
+          <div id="history-records">
+            <div class="history-empty" id="history-empty">No calculations yet</div>
           </div>
         </div>
 
@@ -301,6 +426,32 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.shadowRootRef.innerHTML = template;
     this.displayElement = this.shadowRootRef.getElementById('display') as HTMLElement;
     this.badgeElement = this.shadowRootRef.getElementById('memory-badge') as HTMLElement;
+    this.drawerElement = this.shadowRootRef.getElementById('history-drawer') as HTMLElement;
+    if (this.drawerElement) this.drawerElement.style.display = 'none';
+
+    const toggleBtn = this.shadowRootRef.getElementById('btn-toggle-history');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => this.toggleHistory());
+    }
+
+    const clearHistBtn = this.shadowRootRef.getElementById('btn-clear-history');
+    if (clearHistBtn) {
+      clearHistBtn.addEventListener('click', () => {
+        this.history.clear();
+        this.updateHistoryList();
+      });
+    }
+
+    const historyRecords = this.shadowRootRef.getElementById('history-records');
+    if (historyRecords) {
+      historyRecords.addEventListener('click', (e) => {
+        const item = (e.target as HTMLElement).closest('[data-result]');
+        if (item) {
+          const res = item.getAttribute('data-result');
+          if (res) this.loadHistoryRecord(res);
+        }
+      });
+    }
 
     const memoryRow = this.shadowRootRef.getElementById('memory-row');
     if (memoryRow) {
@@ -317,7 +468,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           this.engine.setDisplayValue(formatDisplay(val));
         } else if (memAction === 'M+') {
           this.memory.add(currentVal);
-          this.engine.allClear(); // ready for next calculation
+          this.engine.allClear();
         } else if (memAction === 'M-') {
           this.memory.subtract(currentVal);
           this.engine.allClear();
@@ -342,7 +493,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         } else if (op !== null) {
           this.engine.inputOperator(op);
         } else if (action === 'calculate') {
-          this.engine.calculate();
+          this.triggerCalculate();
         } else if (action === 'allClear') {
           this.engine.allClear();
         } else if (action === 'clearEntry') {
