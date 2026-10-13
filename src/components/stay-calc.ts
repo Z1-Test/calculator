@@ -1,14 +1,18 @@
 import { CalcEngine, formatDisplay } from '../engine/calc-engine.ts';
+import { MemoryStore } from '../engine/memory-store.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
+  public memory: MemoryStore;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
+  private badgeElement: HTMLElement | null = null;
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
   constructor() {
     super();
     this.engine = new CalcEngine();
+    this.memory = new MemoryStore();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -21,6 +25,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
   public connectedCallback(): void {
     this.render();
+    this.updateDisplay();
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', this.boundKeyHandler);
     }
@@ -76,6 +81,9 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     if (this.displayElement) {
       this.displayElement.textContent = this.engine.getState().display;
     }
+    if (this.badgeElement) {
+      this.badgeElement.style.display = this.memory.hasMemory() ? 'inline-block' : 'none';
+    }
   }
 
   public render(): void {
@@ -95,7 +103,9 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           --calc-surface: #f4f4f5;
           --calc-surface-key: #ffffff;
           --calc-surface-op: #e4e4e7;
+          --calc-surface-mem: #f1f5f9;
           --calc-text-primary: #09090b;
+          --calc-text-secondary: #64748b;
           --calc-border: #e4e4e7;
           --calc-focus-ring: #2563eb;
         }
@@ -111,16 +121,41 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 14px;
           width: 100%;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
 
-        .display-card {
+        .display-container {
+          position: relative;
           background: #ffffff;
           border: 1px solid var(--calc-border);
           border-radius: 16px;
-          padding: 24px 20px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 96px;
+        }
+
+        .display-meta {
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+          height: 20px;
+        }
+
+        .memory-badge {
+          background: #dbeafe;
+          color: #1e40af;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 9999px;
+          display: none;
+        }
+
+        .display-card {
           text-align: right;
           font-size: 36px;
           font-weight: 700;
@@ -128,11 +163,37 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          min-height: 88px;
+          font-variant-numeric: tabular-nums;
+          line-height: 1.2;
+        }
+
+        .memory-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+        }
+
+        button.mem-btn {
+          background: var(--calc-surface-mem);
+          color: var(--calc-text-secondary);
+          border: 1px solid var(--calc-border);
+          border-radius: 9999px;
+          height: 38px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.08s ease;
           display: flex;
           align-items: center;
-          justify-content: flex-end;
-          font-variant-numeric: tabular-nums;
+          justify-content: center;
+        }
+
+        button.mem-btn:active {
+          transform: scale(0.95);
+        }
+
+        button.mem-btn:focus-visible {
+          outline: 2px solid var(--calc-focus-ring);
         }
 
         .keypad-grid {
@@ -145,7 +206,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         button.calc-btn {
           border: 1px solid var(--calc-border);
           border-radius: 9999px;
-          height: 56px;
+          height: 54px;
           font-size: 18px;
           font-weight: 600;
           cursor: pointer;
@@ -186,14 +247,27 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         @container (max-width: 350px) {
           .calc-container { padding: 12px; }
           button.calc-btn { height: 48px; font-size: 16px; }
-          .display-card { font-size: 28px; padding: 16px; }
+          .display-card { font-size: 28px; }
         }
       </style>
       <div class="calc-container" part="container">
         <slot name="header"></slot>
-        <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
-          ${this.engine.getState().display}
+        <div class="display-container" part="display-container">
+          <div class="display-meta">
+            <span id="memory-badge" class="memory-badge" part="memory-badge">M</span>
+          </div>
+          <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
+            ${this.engine.getState().display}
+          </div>
         </div>
+
+        <div id="memory-row" class="memory-row" role="group" aria-label="Memory registers" part="memory-row">
+          <button type="button" class="mem-btn" data-mem="MC" aria-label="Memory Clear">MC</button>
+          <button type="button" class="mem-btn" data-mem="MR" aria-label="Memory Recall">MR</button>
+          <button type="button" class="mem-btn" data-mem="M+" aria-label="Memory Add">M+</button>
+          <button type="button" class="mem-btn" data-mem="M-" aria-label="Memory Subtract">M−</button>
+        </div>
+
         <div id="keypad" class="keypad-grid" role="group" aria-label="Calculator keypad" part="keypad">
           <button type="button" class="calc-btn btn-clear" data-action="allClear" aria-label="All Clear">AC</button>
           <button type="button" class="calc-btn" data-action="clearEntry" aria-label="Clear Entry">C</button>
@@ -226,6 +300,32 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
     this.shadowRootRef.innerHTML = template;
     this.displayElement = this.shadowRootRef.getElementById('display') as HTMLElement;
+    this.badgeElement = this.shadowRootRef.getElementById('memory-badge') as HTMLElement;
+
+    const memoryRow = this.shadowRootRef.getElementById('memory-row');
+    if (memoryRow) {
+      memoryRow.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        const memAction = btn.getAttribute('data-mem');
+        const currentVal = parseFloat(this.engine.getState().display) || 0;
+
+        if (memAction === 'MC') {
+          this.memory.clear();
+        } else if (memAction === 'MR') {
+          const val = this.memory.recall();
+          this.engine.setDisplayValue(formatDisplay(val));
+        } else if (memAction === 'M+') {
+          this.memory.add(currentVal);
+          this.engine.allClear(); // ready for next calculation
+        } else if (memAction === 'M-') {
+          this.memory.subtract(currentVal);
+          this.engine.allClear();
+        }
+
+        this.updateDisplay();
+      });
+    }
 
     const keypad = this.shadowRootRef.getElementById('keypad');
     if (keypad) {

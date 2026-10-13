@@ -25,6 +25,7 @@ export class MockNode {
 
 export class MockElement extends MockNode {
   public tagName: string;
+  public style: Record<string, string> = {};
   public attributes: Map<string, string> = new Map();
   public eventListeners: Map<string, Array<(e: any) => void>> = new Map();
   public shadowRoot: MockShadowRoot | null = null;
