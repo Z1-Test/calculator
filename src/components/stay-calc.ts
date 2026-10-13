@@ -4,6 +4,7 @@ import { HistoryStore } from '../engine/history-store.ts';
 import { ScientificEngine } from '../engine/scientific-engine.ts';
 import { ProgrammerEngine } from '../engine/programmer-engine.ts';
 import { HistoryExportService } from '../services/history-export.ts';
+import { ThemeController, type ThemeMode } from './theme-controller.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
@@ -11,6 +12,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
   public history: HistoryStore;
   public scientific: ScientificEngine;
   public programmer: ProgrammerEngine;
+  public theme: ThemeController;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
@@ -29,6 +31,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.history = new HistoryStore();
     this.scientific = new ScientificEngine();
     this.programmer = new ProgrammerEngine();
+    this.theme = new ThemeController();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -42,6 +45,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
   public connectedCallback(): void {
     this.render();
     this.updateDisplay();
+    this.applyTheme(this.theme.getTheme());
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', this.boundKeyHandler);
     }
@@ -141,6 +145,31 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     return text;
   }
 
+  public setTheme(theme: string): ThemeMode {
+    const applied = this.theme.setTheme(theme);
+    this.applyTheme(applied);
+    return applied;
+  }
+
+  public cycleTheme(): ThemeMode {
+    const next = this.theme.cycle();
+    this.applyTheme(next);
+    return next;
+  }
+
+  public applyTheme(theme: ThemeMode): void {
+    if (typeof (this as any).setAttribute === 'function') {
+      (this as any).setAttribute('data-theme', theme);
+    }
+    if (this.shadowRootRef) {
+      const btn = this.shadowRootRef.getElementById('btn-toggle-theme');
+      if (btn) btn.textContent = this.theme.getLabel(theme);
+    }
+    if (typeof (this as any).dispatchEvent === 'function') {
+      (this as any).dispatchEvent(new CustomEvent('theme-change', { detail: { theme } }));
+    }
+  }
+
   public updateDisplay(): void {
     const currentVal = this.engine.getState().display;
     if (this.displayElement) {
@@ -208,6 +237,36 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           --calc-text-secondary: #64748b;
           --calc-border: #e4e4e7;
           --calc-focus-ring: #2563eb;
+        }
+
+        :host([data-theme="dark"]) {
+          --calc-primary: #3b82f6;
+          --calc-on-primary: #ffffff;
+          --calc-surface: #18181b;
+          --calc-surface-key: #27272a;
+          --calc-surface-op: #3f3f46;
+          --calc-surface-mem: #27272a;
+          --calc-surface-sci: #1e1b4b;
+          --calc-surface-prog: #1e293b;
+          --calc-text-primary: #f4f4f5;
+          --calc-text-secondary: #a1a1aa;
+          --calc-border: #3f3f46;
+          --calc-focus-ring: #60a5fa;
+        }
+
+        :host([data-theme="oled"]) {
+          --calc-primary: #ffffff;
+          --calc-on-primary: #000000;
+          --calc-surface: #000000;
+          --calc-surface-key: #111111;
+          --calc-surface-op: #222222;
+          --calc-surface-mem: #111111;
+          --calc-surface-sci: #000000;
+          --calc-surface-prog: #000000;
+          --calc-text-primary: #ffffff;
+          --calc-text-secondary: #888888;
+          --calc-border: #333333;
+          --calc-focus-ring: #ffffff;
         }
 
         *, *::before, *::after {
@@ -537,6 +596,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
               <button type="button" id="btn-angle-mode" class="history-toggle-btn" aria-label="Toggle angle unit">${this.scientific.getAngleMode()}</button>
             </div>
             <div class="meta-actions">
+              <button type="button" id="btn-toggle-theme" class="history-toggle-btn" aria-label="Toggle visual theme">${this.theme.getLabel()}</button>
               <button type="button" id="btn-toggle-prog" class="history-toggle-btn" aria-label="Toggle programmer keypad">💻 Prog</button>
               <button type="button" id="btn-toggle-sci" class="history-toggle-btn" aria-label="Toggle scientific keypad">🔬 Sci</button>
               <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
@@ -649,6 +709,11 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     const toggleProgBtn = this.shadowRootRef.getElementById('btn-toggle-prog');
     if (toggleProgBtn) {
       toggleProgBtn.addEventListener('click', () => this.toggleProgrammer());
+    }
+
+    const toggleThemeBtn = this.shadowRootRef.getElementById('btn-toggle-theme');
+    if (toggleThemeBtn) {
+      toggleThemeBtn.addEventListener('click', () => this.cycleTheme());
     }
 
     const angleBtn = this.shadowRootRef.getElementById('btn-angle-mode');

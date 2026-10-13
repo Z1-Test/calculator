@@ -59,7 +59,11 @@ export class MockElement extends MockNode {
   }
 
   public dispatchEvent(event: any): boolean {
-    event.target = this;
+    try {
+      Object.defineProperty(event, 'target', { value: this, configurable: true, writable: true });
+    } catch {
+      // Ignore if event.target is read-only native getter
+    }
     const list = this.eventListeners.get(event.type);
     if (list) {
       for (const h of list) {
@@ -134,6 +138,21 @@ export function setupMockDom() {
   (globalThis as any).HTMLElement = MockElement;
   (globalThis as any).ShadowRoot = MockShadowRoot;
   (globalThis as any).KeyboardEvent = MockKeyboardEvent;
+  if (typeof (globalThis as any).CustomEvent === 'undefined') {
+    (globalThis as any).CustomEvent = class CustomEvent {
+      public type: string;
+      public detail: any;
+      public target: any = null;
+      public defaultPrevented: boolean = false;
+      constructor(type: string, init?: { detail?: any }) {
+        this.type = type;
+        this.detail = init?.detail;
+      }
+      public preventDefault(): void {
+        this.defaultPrevented = true;
+      }
+    };
+  }
   (globalThis as any).customElements = {
     define(name: string, constructor: any) {
       registry.set(name, constructor);
