@@ -1,16 +1,20 @@
 import { CalcEngine, formatDisplay } from '../engine/calc-engine.ts';
 import { MemoryStore } from '../engine/memory-store.ts';
 import { HistoryStore } from '../engine/history-store.ts';
+import { ScientificEngine } from '../engine/scientific-engine.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
   public memory: MemoryStore;
   public history: HistoryStore;
+  public scientific: ScientificEngine;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
   private drawerElement: HTMLElement | null = null;
+  private sciPanelElement: HTMLElement | null = null;
   private isHistoryOpen: boolean = false;
+  private isScientificOpen: boolean = false;
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
   constructor() {
@@ -18,6 +22,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.engine = new CalcEngine();
     this.memory = new MemoryStore();
     this.history = new HistoryStore();
+    this.scientific = new ScientificEngine();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -54,8 +59,8 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
       this.engine.inputDecimal();
       this.updateDisplay();
       event.preventDefault();
-    } else if (key === '+' || key === '-' || key === '*' || key === '/') {
-      this.engine.inputOperator(key);
+    } else if (key === '+' || key === '-' || key === '*' || key === '/' || key === '^') {
+      this.engine.inputOperator(key as any);
       this.updateDisplay();
       event.preventDefault();
     } else if (key === 'Enter' || key === '=') {
@@ -99,6 +104,13 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.isHistoryOpen = !this.isHistoryOpen;
     if (this.drawerElement) {
       this.drawerElement.style.display = this.isHistoryOpen ? 'block' : 'none';
+    }
+  }
+
+  public toggleScientific(): void {
+    this.isScientificOpen = !this.isScientificOpen;
+    if (this.sciPanelElement) {
+      this.sciPanelElement.style.display = this.isScientificOpen ? 'grid' : 'none';
     }
   }
 
@@ -148,6 +160,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           --calc-surface-key: #ffffff;
           --calc-surface-op: #e4e4e7;
           --calc-surface-mem: #f1f5f9;
+          --calc-surface-sci: #e0e7ff;
           --calc-text-primary: #09090b;
           --calc-text-secondary: #64748b;
           --calc-border: #e4e4e7;
@@ -165,7 +178,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 12px;
           width: 100%;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
@@ -175,7 +188,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           background: #ffffff;
           border: 1px solid var(--calc-border);
           border-radius: 16px;
-          padding: 20px;
+          padding: 16px 20px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -189,6 +202,12 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           height: 24px;
         }
 
+        .meta-badges {
+          display: flex;
+          gap: 6px;
+          align-items: center;
+        }
+
         .memory-badge {
           background: #dbeafe;
           color: #1e40af;
@@ -197,6 +216,11 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           padding: 2px 8px;
           border-radius: 9999px;
           display: none;
+        }
+
+        .meta-actions {
+          display: flex;
+          gap: 8px;
         }
 
         .history-toggle-btn {
@@ -281,6 +305,39 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           font-style: italic;
         }
 
+        .scientific-grid {
+          display: none;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+          background: var(--calc-surface-sci);
+          padding: 10px;
+          border-radius: 16px;
+          border: 1px solid #c7d2fe;
+        }
+
+        button.sci-btn {
+          background: #ffffff;
+          color: #3730a3;
+          border: 1px solid #c7d2fe;
+          border-radius: 9999px;
+          height: 38px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.08s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        button.sci-btn:active {
+          transform: scale(0.95);
+        }
+
+        button.sci-btn:focus-visible {
+          outline: 2px solid var(--calc-focus-ring);
+        }
+
         .memory-row {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -292,7 +349,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           color: var(--calc-text-secondary);
           border: 1px solid var(--calc-border);
           border-radius: 9999px;
-          height: 38px;
+          height: 36px;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
@@ -320,7 +377,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         button.calc-btn {
           border: 1px solid var(--calc-border);
           border-radius: 9999px;
-          height: 54px;
+          height: 52px;
           font-size: 18px;
           font-weight: 600;
           cursor: pointer;
@@ -360,7 +417,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
         @container (max-width: 350px) {
           .calc-container { padding: 12px; }
-          button.calc-btn { height: 48px; font-size: 16px; }
+          button.calc-btn { height: 46px; font-size: 16px; }
           .display-card { font-size: 28px; }
         }
       </style>
@@ -368,12 +425,29 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         <slot name="header"></slot>
         <div class="display-container" part="display-container">
           <div class="display-meta">
-            <span id="memory-badge" class="memory-badge" part="memory-badge">M</span>
-            <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
+            <div class="meta-badges">
+              <span id="memory-badge" class="memory-badge" part="memory-badge">M</span>
+              <button type="button" id="btn-angle-mode" class="history-toggle-btn" aria-label="Toggle angle unit">${this.scientific.getAngleMode()}</button>
+            </div>
+            <div class="meta-actions">
+              <button type="button" id="btn-toggle-sci" class="history-toggle-btn" aria-label="Toggle scientific keypad">🔬 Sci</button>
+              <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
+            </div>
           </div>
           <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
             ${this.engine.getState().display}
           </div>
+        </div>
+
+        <div id="scientific-panel" class="scientific-grid" part="scientific-panel">
+          <button type="button" class="sci-btn" data-sci="sqrt" aria-label="Square root">√x</button>
+          <button type="button" class="sci-btn" data-sci="square" aria-label="Square">x²</button>
+          <button type="button" class="sci-btn" data-sci="power" aria-label="Power">xʸ</button>
+          <button type="button" class="sci-btn" data-sci="pi" aria-label="Pi">π</button>
+          <button type="button" class="sci-btn" data-sci="e" aria-label="Euler number">e</button>
+          <button type="button" class="sci-btn" data-sci="sin" aria-label="Sine">sin</button>
+          <button type="button" class="sci-btn" data-sci="cos" aria-label="Cosine">cos</button>
+          <button type="button" class="sci-btn" data-sci="tan" aria-label="Tangent">tan</button>
         </div>
 
         <div id="history-drawer" class="history-drawer" part="history-drawer">
@@ -428,10 +502,25 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.badgeElement = this.shadowRootRef.getElementById('memory-badge') as HTMLElement;
     this.drawerElement = this.shadowRootRef.getElementById('history-drawer') as HTMLElement;
     if (this.drawerElement) this.drawerElement.style.display = 'none';
+    this.sciPanelElement = this.shadowRootRef.getElementById('scientific-panel') as HTMLElement;
+    if (this.sciPanelElement) this.sciPanelElement.style.display = 'none';
 
     const toggleBtn = this.shadowRootRef.getElementById('btn-toggle-history');
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => this.toggleHistory());
+    }
+
+    const toggleSciBtn = this.shadowRootRef.getElementById('btn-toggle-sci');
+    if (toggleSciBtn) {
+      toggleSciBtn.addEventListener('click', () => this.toggleScientific());
+    }
+
+    const angleBtn = this.shadowRootRef.getElementById('btn-angle-mode');
+    if (angleBtn) {
+      angleBtn.addEventListener('click', () => {
+        const newMode = this.scientific.toggleAngleMode();
+        angleBtn.textContent = newMode;
+      });
     }
 
     const clearHistBtn = this.shadowRootRef.getElementById('btn-clear-history');
@@ -450,6 +539,49 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           const res = item.getAttribute('data-result');
           if (res) this.loadHistoryRecord(res);
         }
+      });
+    }
+
+    const sciPanel = this.shadowRootRef.getElementById('scientific-panel');
+    if (sciPanel) {
+      sciPanel.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        const sciOp = btn.getAttribute('data-sci');
+        const val = parseFloat(this.engine.getState().display) || 0;
+
+        if (sciOp === 'sqrt') {
+          const res = this.scientific.sqrt(val);
+          if (res === 'Invalid input') {
+            this.engine.setError('Invalid input');
+          } else {
+            this.engine.setDisplayValue(formatDisplay(res));
+          }
+        } else if (sciOp === 'square') {
+          const res = this.scientific.square(val);
+          this.engine.setDisplayValue(formatDisplay(res));
+        } else if (sciOp === 'power') {
+          this.engine.inputOperator('^');
+        } else if (sciOp === 'pi') {
+          this.engine.setDisplayValue(formatDisplay(this.scientific.pi()));
+        } else if (sciOp === 'e') {
+          this.engine.setDisplayValue(formatDisplay(this.scientific.e()));
+        } else if (sciOp === 'sin') {
+          const res = this.scientific.sin(val);
+          this.engine.setDisplayValue(formatDisplay(res));
+        } else if (sciOp === 'cos') {
+          const res = this.scientific.cos(val);
+          this.engine.setDisplayValue(formatDisplay(res));
+        } else if (sciOp === 'tan') {
+          const res = this.scientific.tan(val);
+          if (res === 'Invalid input') {
+            this.engine.setError('Invalid input');
+          } else {
+            this.engine.setDisplayValue(formatDisplay(res));
+          }
+        }
+
+        this.updateDisplay();
       });
     }
 
@@ -485,7 +617,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
         if (!btn) return;
 
         const digit = btn.getAttribute('data-digit');
-        const op = btn.getAttribute('data-op') as '+' | '-' | '*' | '/' | null;
+        const op = btn.getAttribute('data-op') as '+' | '-' | '*' | '/' | '^' | null;
         const action = btn.getAttribute('data-action');
 
         if (digit !== null) {

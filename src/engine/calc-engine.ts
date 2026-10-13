@@ -4,7 +4,7 @@
  * Adheres strictly to the Calculator Behavioral Contract Table.
  */
 
-export type Operator = '+' | '-' | '*' | '/' | null;
+export type Operator = '+' | '-' | '*' | '/' | '^' | null;
 
 export interface EngineState {
   display: string;
@@ -92,7 +92,7 @@ export class CalcEngine {
     return this.getState();
   }
 
-  public inputOperator(op: '+' | '-' | '*' | '/'): Readonly<EngineState> {
+  public inputOperator(op: '+' | '-' | '*' | '/' | '^'): Readonly<EngineState> {
     if (this.state.hasError) return this.getState();
 
     const inputValue = parseFloat(this.state.display);
@@ -192,7 +192,17 @@ export class CalcEngine {
     return this.getState();
   }
 
-  private executeMath(a: number, b: number, op: '+' | '-' | '*' | '/'): number {
+  public setError(msg: string): Readonly<EngineState> {
+    this.state.hasError = true;
+    this.state.errorMessage = msg;
+    this.state.display = msg;
+    this.state.accumulator = null;
+    this.state.pendingOperator = null;
+    this.state.waitingForOperand = true;
+    return this.getState();
+  }
+
+  private executeMath(a: number, b: number, op: '+' | '-' | '*' | '/' | '^'): number {
     let raw = 0;
     switch (op) {
       case '+':
@@ -203,6 +213,9 @@ export class CalcEngine {
         break;
       case '*':
         raw = a * b;
+        break;
+      case '^':
+        raw = Math.pow(a, b);
         break;
       case '/':
         if (b === 0) {
