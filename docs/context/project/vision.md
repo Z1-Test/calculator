@@ -19,17 +19,17 @@ StayCalc is a modern, ultra-responsive, offline-first Progressive Web App (PWA) 
 
 ## 2. Core Principles
 
-1. **Zero External Runtime Dependencies**: Built entirely on native Web Standards (W3C Custom Elements, Web Workers, CSS Container Queries, Service Workers) ensuring zero bloat and instant load times.
+1. **Zero External Runtime Dependencies**: Built entirely on native Web Standards (W3C Custom Elements, Declarative Shadow DOM, and modern CSS) ensuring zero bloat and instant load times.
 2. **Offline-First Reliability**: Functional 100% offline out-of-the-box via Service Worker caching with zero degradation in calculation capability.
 3. **Sub-16ms Interaction Latency**: Immediate tactile feedback for all keypresses and mathematical evaluations without frame drops or UI blocking.
 4. **Universal Accessibility (WCAG 2.2 AA)**: Native keyboard navigation, high-contrast color tokens, and polite ARIA live regions for screen readers.
-5. **Deterministic Precision**: IEEE-754 floating-point mitigation and BigInt radix handling ensuring correct arithmetic without decimal representation glitches.
+5. **Deterministic Precision**: IEEE-754 floating-point mitigation ensuring correct arithmetic without decimal representation glitches.
 
 ## 3. Strategic Outcomes
 
-- **Multi-Mode Flexibility**: Effortless toggle between Standard 4-function, Scientific (trigonometry, logarithms, powers), and Programmer (Hex, Dec, Oct, Bin bitwise operations) modes.
+- **Multi-Mode Flexibility**: Effortless toggle between Standard 4-function, Scientific (trigonometry, logarithms, powers), and Programmer modes.
 - **Persistent History & Memory**: Durable local storage of previous calculation tapes and memory registers across sessions.
-- **Responsive Theming**: Seamless switching between Light and Dark visual themes aligned with Staylook design tokens.
+- **Responsive Theming**: Seamless switching between Light and Dark visual themes aligned with semantic design tokens.
 
 ## 4. Non-Goals
 

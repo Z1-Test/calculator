@@ -2,7 +2,7 @@
 type: Concept
 title: "StayCalc Design System"
 status: stable
-tags: [design, staylook, tokens]
+tags: [design, tokens, theme]
 version: alpha
 name: "StayCalc Design System"
 description: >
@@ -10,23 +10,23 @@ description: >
   vibrant electric blue accents, crisp tabular typography, and tactile pill geometry.
 
 colors:
-  sl-primary: "var(--sl-primary, #2563eb)"
-  sl-on-primary: "var(--sl-on-primary, #ffffff)"
-  sl-secondary: "var(--sl-secondary, #475569)"
-  sl-tertiary: "var(--sl-tertiary, #f4f4f5)"
-  sl-background: "var(--sl-background, #ffffff)"
-  sl-surface: "var(--sl-surface, #f4f4f5)"
-  sl-container-high: "var(--sl-container-high, #ffffff)"
-  sl-container-medium: "var(--sl-container-medium, #f4f4f5)"
-  sl-container-low: "var(--sl-container-low, #e4e4e7)"
-  sl-text-primary: "var(--sl-text-primary, #09090b)"
-  sl-text-secondary: "var(--sl-text-secondary, #71717a)"
-  sl-outline-low: "var(--sl-outline-low, #e4e4e7)"
-  sl-info: "var(--sl-info, #0a84ff)"
-  sl-success: "var(--sl-success, #30d158)"
-  sl-warning: "var(--sl-warning, #ffd60a)"
-  sl-error: "var(--sl-error, #ff453a)"
-  sl-scrim: "var(--sl-scrim, oklch(0.4184 0 89.88))"
+  primary: "var(--calc-primary, #2563eb)"
+  on-primary: "var(--calc-on-primary, #ffffff)"
+  secondary: "var(--calc-secondary, #475569)"
+  tertiary: "var(--calc-tertiary, #f4f4f5)"
+  background: "var(--calc-background, #ffffff)"
+  surface: "var(--calc-surface, #f4f4f5)"
+  container-high: "var(--calc-container-high, #ffffff)"
+  container-medium: "var(--calc-container-medium, #f4f4f5)"
+  container-low: "var(--calc-container-low, #e4e4e7)"
+  text-primary: "var(--calc-text-primary, #09090b)"
+  text-secondary: "var(--calc-text-secondary, #71717a)"
+  outline-low: "var(--calc-outline-low, #e4e4e7)"
+  info: "var(--calc-info, #0a84ff)"
+  success: "var(--calc-success, #30d158)"
+  warning: "var(--calc-warning, #ffd60a)"
+  error: "var(--calc-error, #ff453a)"
+  scrim: "var(--calc-scrim, rgba(0, 0, 0, 0.4))"
 
 typography:
   display-xl:
@@ -79,7 +79,7 @@ rounded:
   md: 14px
   lg: 16px
   xl: 24px
-  full: 624.9375rem
+  full: 9999px
 
 spacing:
   xxs: 2px
@@ -94,33 +94,33 @@ spacing:
 
 components:
   calc-key-primary:
-    backgroundColor: "{colors.sl-primary}"
-    textColor: "{colors.sl-on-primary}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
     typography: "{typography.button-md}"
     rounded: "{rounded.full}"
     padding: 16px 20px
     height: 56px
   calc-key-numeric:
-    backgroundColor: "{colors.sl-surface}"
-    textColor: "{colors.sl-text-primary}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text-primary}"
     typography: "{typography.button-md}"
     rounded: "{rounded.full}"
-    border: "1px solid {colors.sl-outline-low}"
+    border: "1px solid {colors.outline-low}"
     padding: 16px 20px
     height: 56px
   calc-display:
-    backgroundColor: "{colors.sl-background}"
-    textColor: "{colors.sl-text-primary}"
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.text-primary}"
     typography: "{typography.display-xl}"
     rounded: "{rounded.lg}"
     padding: 24px
-    border: "1px solid {colors.sl-outline-low}"
+    border: "1px solid {colors.outline-low}"
   history-drawer:
-    backgroundColor: "{colors.sl-background}"
-    textColor: "{colors.sl-text-primary}"
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.text-primary}"
     typography: "{typography.body-md}"
     rounded: "{rounded.lg}"
-    border: "1px solid {colors.sl-outline-low}"
+    border: "1px solid {colors.outline-low}"
     padding: 20px
 ---
 
@@ -130,7 +130,7 @@ components:
 A high-velocity, tactile calculator interface optimized for instant calculation response, clean neutral canvas backgrounds, and expressive electric blue highlights. Supports seamless dynamic light and dark theme switching through CSS variable bindings.
 
 ## Colors
-Color names come from Staytoken in `@staytunedllp/staystack`. Color values use Staylook CSS variable syntax `var(--sl-*, <fallback>)` to bind directly to theme variables while providing brand fallback colors. `{colors.sl-primary}` is the primary evaluation action trigger (`=`). Standard numeric keys utilize `{colors.sl-surface}` with high-contrast text.
+Color values use native CSS variable syntax `var(--calc-*, <fallback>)` to bind directly to theme variables while providing brand fallback colors. `{colors.primary}` is the primary evaluation action trigger (`=`). Standard numeric keys utilize `{colors.surface}` with high-contrast text.
 
 ## Typography
 Calculated totals and active expressions utilize tabular lining numerals with Plus Jakarta Sans and Inter font stacks to prevent digit jumping during rapid entry.
@@ -141,10 +141,10 @@ Keypad layouts utilize CSS Grid with 8px to 12px gaps:
 - **Desktop / Wide Viewport**: Expanded 6-column to 8-column layout with side-by-side history panel.
 
 ## Elevation & Depth
-Depth is created through clean hairline borders (`1px solid {colors.sl-outline-low}`) and subtle key depression active states (`transform: scale(0.96)`) rather than heavy drop shadows.
+Depth is created through clean hairline borders (`1px solid {colors.outline-low}`) and subtle key depression active states (`transform: scale(0.96)`) rather than heavy drop shadows.
 
 ## Shapes
-All calculator keypad triggers are strictly pill-shaped (`{rounded.full}`, Staytoken `--sl-radius-9999` at 624.9375rem). Container panels and the display card use 16px radius (`{rounded.lg}`).
+All calculator keypad triggers are strictly pill-shaped (`{rounded.full}`). Container panels and the display card use 16px radius (`{rounded.lg}`).
 
 ## Do's and Don'ts
 - **DO** maintain pill shape (`rounded: full`) on all keypad buttons.
