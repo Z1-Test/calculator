@@ -1,0 +1,13 @@
+node_modules/
+.artifacts/
+scratch/
+.playwright-mcp/
+dist/
+*.log
+
+# Operational benchmark tracking files
+STATE.md
+task.md
+TOKEN_USAGE.md
+DHOOM_IMPROVEMENTS.md
+FACTORY_EVALUATION_REPORT.md
