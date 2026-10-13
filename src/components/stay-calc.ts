@@ -5,6 +5,7 @@ import { ScientificEngine } from '../engine/scientific-engine.ts';
 import { ProgrammerEngine } from '../engine/programmer-engine.ts';
 import { HistoryExportService } from '../services/history-export.ts';
 import { ThemeController, type ThemeMode } from './theme-controller.ts';
+import { UnitConverterEngine } from '../engine/unit-converter.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
@@ -13,15 +14,18 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
   public scientific: ScientificEngine;
   public programmer: ProgrammerEngine;
   public theme: ThemeController;
+  public converter: UnitConverterEngine;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
   private drawerElement: HTMLElement | null = null;
   private sciPanelElement: HTMLElement | null = null;
   private progPanelElement: HTMLElement | null = null;
+  private convPanelElement: HTMLElement | null = null;
   private isHistoryOpen: boolean = false;
   private isScientificOpen: boolean = false;
   private isProgrammerOpen: boolean = false;
+  private isConverterOpen: boolean = false;
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
   constructor() {
@@ -32,6 +36,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.scientific = new ScientificEngine();
     this.programmer = new ProgrammerEngine();
     this.theme = new ThemeController();
+    this.converter = new UnitConverterEngine();
     this.boundKeyHandler = this.handleKeydown.bind(this);
     if (typeof this.attachShadow === 'function') {
       this.shadowRootRef = this.attachShadow({ mode: 'open' });
@@ -128,6 +133,13 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     this.isProgrammerOpen = !this.isProgrammerOpen;
     if (this.progPanelElement) {
       this.progPanelElement.style.display = this.isProgrammerOpen ? 'flex' : 'none';
+    }
+  }
+
+  public toggleConverter(): void {
+    this.isConverterOpen = !this.isConverterOpen;
+    if (this.convPanelElement) {
+      this.convPanelElement.style.display = this.isConverterOpen ? 'flex' : 'none';
     }
   }
 
@@ -400,6 +412,44 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           cursor: pointer;
         }
 
+        .converter-panel {
+          display: none;
+          flex-direction: column;
+          gap: 8px;
+          background: var(--calc-surface-mem);
+          border: 1px solid var(--calc-border);
+          border-radius: 14px;
+          padding: 10px;
+          font-size: 12px;
+        }
+
+        .conv-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .conv-title {
+          font-weight: 700;
+          color: var(--calc-text-secondary);
+        }
+
+        .conv-actions {
+          display: flex;
+          gap: 4px;
+          flex-wrap: wrap;
+        }
+
+        button.conv-btn {
+          background: #ffffff;
+          border: 1px solid var(--calc-border);
+          border-radius: 6px;
+          padding: 4px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
         .history-drawer {
           display: none;
           background: #ffffff;
@@ -597,6 +647,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
             </div>
             <div class="meta-actions">
               <button type="button" id="btn-toggle-theme" class="history-toggle-btn" aria-label="Toggle visual theme">${this.theme.getLabel()}</button>
+              <button type="button" id="btn-toggle-conv" class="history-toggle-btn" aria-label="Toggle unit converter">🔄 Conv</button>
               <button type="button" id="btn-toggle-prog" class="history-toggle-btn" aria-label="Toggle programmer keypad">💻 Prog</button>
               <button type="button" id="btn-toggle-sci" class="history-toggle-btn" aria-label="Toggle scientific keypad">🔬 Sci</button>
               <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
@@ -604,6 +655,19 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
           </div>
           <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
             ${this.engine.getState().display}
+          </div>
+        </div>
+
+        <div id="converter-panel" class="converter-panel" part="converter-panel">
+          <div class="conv-controls">
+            <span class="conv-title">Unit Converter</span>
+            <div class="conv-actions">
+              <button type="button" class="conv-btn" data-conv="km-to-m">km ➔ m</button>
+              <button type="button" class="conv-btn" data-conv="m-to-ft">m ➔ ft</button>
+              <button type="button" class="conv-btn" data-conv="c-to-f">°C ➔ °F</button>
+              <button type="button" class="conv-btn" data-conv="f-to-c">°F ➔ °C</button>
+              <button type="button" class="conv-btn" data-conv="kg-to-lb">kg ➔ lb</button>
+            </div>
           </div>
         </div>
 
@@ -695,6 +759,43 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     if (this.sciPanelElement) this.sciPanelElement.style.display = 'none';
     this.progPanelElement = this.shadowRootRef.getElementById('programmer-panel') as HTMLElement;
     if (this.progPanelElement) this.progPanelElement.style.display = 'none';
+    this.convPanelElement = this.shadowRootRef.getElementById('converter-panel') as HTMLElement;
+    if (this.convPanelElement) this.convPanelElement.style.display = 'none';
+
+    const toggleConvBtn = this.shadowRootRef.getElementById('btn-toggle-conv');
+    if (toggleConvBtn) {
+      toggleConvBtn.addEventListener('click', () => this.toggleConverter());
+    }
+
+    const convPanel = this.shadowRootRef.getElementById('converter-panel');
+    if (convPanel) {
+      convPanel.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('button[data-conv]');
+        if (!btn) return;
+        const kind = btn.getAttribute('data-conv');
+        const currentVal = parseFloat(this.engine.getState().display) || 0;
+        let converted: number | string = currentVal;
+
+        if (kind === 'km-to-m') {
+          converted = this.converter.convertLength(currentVal, 'km', 'm');
+        } else if (kind === 'm-to-ft') {
+          converted = this.converter.convertLength(currentVal, 'm', 'ft');
+        } else if (kind === 'c-to-f') {
+          converted = this.converter.convertTemperature(currentVal, 'C', 'F');
+        } else if (kind === 'f-to-c') {
+          converted = this.converter.convertTemperature(currentVal, 'F', 'C');
+        } else if (kind === 'kg-to-lb') {
+          converted = this.converter.convertMass(currentVal, 'kg', 'lb');
+        }
+
+        if (converted === 'Invalid input') {
+          this.engine.setError('Invalid input');
+        } else {
+          this.engine.setDisplayValue(String(converted));
+        }
+        this.updateDisplay();
+      });
+    }
 
     const toggleBtn = this.shadowRootRef.getElementById('btn-toggle-history');
     if (toggleBtn) {
