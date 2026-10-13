@@ -6,6 +6,7 @@ import { ProgrammerEngine } from '../engine/programmer-engine.ts';
 import { HistoryExportService } from '../services/history-export.ts';
 import { ThemeController, type ThemeMode } from './theme-controller.ts';
 import { UnitConverterEngine } from '../engine/unit-converter.ts';
+import { ExpressionDisplayController } from './expression-display.ts';
 
 export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLElement : (class {} as unknown as typeof HTMLElement)) {
   public engine: CalcEngine;
@@ -17,6 +18,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
   public converter: UnitConverterEngine;
   private shadowRootRef: ShadowRoot | null = null;
   private displayElement: HTMLElement | null = null;
+  private previewElement: HTMLElement | null = null;
   private badgeElement: HTMLElement | null = null;
   private drawerElement: HTMLElement | null = null;
   private sciPanelElement: HTMLElement | null = null;
@@ -45,6 +47,10 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
   public get displayValue(): string {
     return this.engine.getState().display;
+  }
+
+  public get expressionPreview(): string {
+    return this.engine.getFormulaPreview();
   }
 
   public connectedCallback(): void {
@@ -186,6 +192,9 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
     const currentVal = this.engine.getState().display;
     if (this.displayElement) {
       this.displayElement.textContent = currentVal;
+    }
+    if (this.previewElement) {
+      this.previewElement.textContent = ExpressionDisplayController.getPreview(this.engine);
     }
     if (this.badgeElement) {
       this.badgeElement.style.display = this.memory.hasMemory() ? 'inline-block' : 'none';
@@ -350,6 +359,17 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
         .history-toggle-btn:focus-visible {
           outline: 2px solid var(--calc-focus-ring);
+        }
+
+        .expression-preview {
+          text-align: right;
+          font-size: 14px;
+          min-height: 20px;
+          color: var(--calc-text-secondary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
         }
 
         .display-card {
@@ -653,6 +673,9 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
               <button type="button" id="btn-toggle-history" class="history-toggle-btn" aria-label="Toggle calculation history">📜 History</button>
             </div>
           </div>
+          <div id="expression-preview" class="expression-preview" role="status" aria-label="Formula expression" aria-live="polite" part="expression-preview">
+            ${this.engine.getFormulaPreview()}
+          </div>
           <div id="display" class="display-card" role="status" aria-live="polite" aria-label="Calculation result" part="display">
             ${this.engine.getState().display}
           </div>
@@ -752,6 +775,7 @@ export class StayCalcElement extends (typeof HTMLElement !== 'undefined' ? HTMLE
 
     this.shadowRootRef.innerHTML = template;
     this.displayElement = this.shadowRootRef.getElementById('display') as HTMLElement;
+    this.previewElement = this.shadowRootRef.getElementById('expression-preview') as HTMLElement;
     this.badgeElement = this.shadowRootRef.getElementById('memory-badge') as HTMLElement;
     this.drawerElement = this.shadowRootRef.getElementById('history-drawer') as HTMLElement;
     if (this.drawerElement) this.drawerElement.style.display = 'none';

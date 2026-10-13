@@ -202,6 +202,23 @@ export class CalcEngine {
     return this.getState();
   }
 
+  public getFormulaPreview(): string {
+    if (this.state.hasError && this.state.lastExpression) {
+      return this.state.lastExpression;
+    }
+    if (this.state.accumulator !== null && this.state.pendingOperator !== null) {
+      return `${formatDisplay(this.state.accumulator)} ${this.state.pendingOperator}`;
+    }
+    if (this.state.lastExpression) {
+      const eqIdx = this.state.lastExpression.indexOf('=');
+      if (eqIdx !== -1) {
+        return this.state.lastExpression.substring(0, eqIdx + 1).trim();
+      }
+      return this.state.lastExpression;
+    }
+    return '';
+  }
+
   private executeMath(a: number, b: number, op: '+' | '-' | '*' | '/' | '^'): number {
     let raw = 0;
     switch (op) {
@@ -221,6 +238,7 @@ export class CalcEngine {
         if (b === 0) {
           this.state.hasError = true;
           this.state.errorMessage = 'Cannot divide by zero';
+          this.state.lastExpression = `${formatDisplay(a)} / ${formatDisplay(b)} =`;
           this.state.display = 'Cannot divide by zero';
           this.state.accumulator = null;
           this.state.pendingOperator = null;

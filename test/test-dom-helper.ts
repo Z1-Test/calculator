@@ -97,12 +97,17 @@ export class MockShadowRoot extends MockElement {
   public set innerHTML(html: string) {
     this.innerHTMLString = html;
     this.elementsById.clear();
-    // Simple id extraction for test query
-    const idMatches = html.matchAll(/id="([^"]+)"/g);
-    for (const match of idMatches) {
-      const el = new MockElement();
-      el.setAttribute('id', match[1]);
-      this.elementsById.set(match[1], el);
+    const tagMatches = html.matchAll(/<([a-z0-9-]+)\s+([^>]*id="([^"]+)"[^>]*)>/gi);
+    for (const match of tagMatches) {
+      const tagName = match[1];
+      const attrString = match[2];
+      const id = match[3];
+      const el = new MockElement(tagName);
+      const attrMatches = attrString.matchAll(/([a-z0-9-]+)="([^"]*)"/gi);
+      for (const attr of attrMatches) {
+        el.setAttribute(attr[1], attr[2]);
+      }
+      this.elementsById.set(id, el);
     }
   }
 
