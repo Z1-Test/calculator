@@ -3,9 +3,12 @@
  *
  * W3C Autonomous Custom Element <stay-calc> providing:
  * - Encapsulated Declarative Shadow DOM (DSD) template and slot projection graph
- * - Integration with F1 CalculatorEngine via SEAM-ENGINE-01
+ * - Integration with F1/F5 CalculatorEngine via SEAM-ENGINE-01
  * - Full interactive keypad buttons (0-9, ., +, -, *, /, =, C, AC, +/-, ⌫)
- * - Physical keyboard interception (0-9, operators, Enter, Backspace, Escape, .)
+ * - Scientific mode toggle (#modeToggle) and angle unit toggle (#angleUnitToggle / #angleUnitIndicator)
+ * - Scientific functions grid (#scientificKeys: √, x², xʸ, π, e, sin, cos, tan)
+ * - Calculation history tape and slide-out drawer panel (#historyDrawer, #historyToggle)
+ * - Physical keyboard interception (0-9, operators, ^, Enter, Backspace, Escape, .)
  * - WCAG 2.2 AA contrast compliance and visible focus rings (:focus-visible)
  * - CSS logical properties and container query responsive layout
  * - Mobile viewport zero horizontal scroll overflow (320px–390px)
@@ -22,6 +25,8 @@ import type {
   CalculatorState,
   CalculationHistoryEntry,
   Operator,
+  CalculatorMode,
+  AngleUnit,
 } from '../engine/types.ts';
 
 const TEMPLATE_STYLES = `
@@ -136,7 +141,7 @@ const TEMPLATE_STYLES = `
     inline-size: 100%;
   }
 
-  .calc-btn {
+  .calc-btn, .sci-btn {
     appearance: none;
     -webkit-appearance: none;
     border: 1px solid var(--calc-outline-low, #e4e4e7);
@@ -159,15 +164,15 @@ const TEMPLATE_STYLES = `
     touch-action: manipulation;
   }
 
-  .calc-btn:hover {
+  .calc-btn:hover, .sci-btn:hover {
     background-color: var(--calc-container-low, #e4e4e7);
   }
 
-  .calc-btn:active {
+  .calc-btn:active, .sci-btn:active {
     transform: scale(0.96);
   }
 
-  .calc-btn:focus-visible {
+  .calc-btn:focus-visible, .sci-btn:focus-visible {
     outline: 2px solid var(--calc-primary, #2563eb);
     outline-offset: 2px;
   }
@@ -205,12 +210,19 @@ const TEMPLATE_STYLES = `
 
   .calc-header {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     inline-size: 100%;
+    gap: 8px;
   }
 
-  .history-toggle-btn {
+  .header-left, .header-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn {
     appearance: none;
     -webkit-appearance: none;
     border: 1px solid var(--calc-outline-low, #e4e4e7);
@@ -232,13 +244,39 @@ const TEMPLATE_STYLES = `
     touch-action: manipulation;
   }
 
-  .history-toggle-btn:hover {
+  .mode-toggle-btn:hover, .angle-unit-toggle-btn:hover, .history-toggle-btn:hover {
     background-color: var(--calc-container-low, #e4e4e7);
   }
 
-  .history-toggle-btn:focus-visible {
+  .mode-toggle-btn:focus-visible, .angle-unit-toggle-btn:focus-visible, .history-toggle-btn:focus-visible {
     outline: 2px solid var(--calc-primary, #2563eb);
     outline-offset: 2px;
+  }
+
+  .angle-unit-indicator {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--calc-primary, #2563eb);
+    letter-spacing: 0.05em;
+  }
+
+  .scientific-keys {
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    inline-size: 100%;
+  }
+
+  .scientific-keys.visible {
+    display: grid;
+  }
+
+  .sci-btn {
+    font-size: 16px;
+    min-block-size: 46px;
+    padding-inline: 8px;
+    padding-block: 10px;
+    background-color: var(--calc-container-medium, #f4f4f5);
   }
 
   .history-drawer {
@@ -371,6 +409,15 @@ const TEMPLATE_STYLES = `
     .history-entry-result {
       font-size: 15px;
     }
+    .scientific-keys {
+      gap: 6px;
+    }
+    .sci-btn {
+      min-block-size: 40px;
+      font-size: 14px;
+      padding-inline: 6px;
+      padding-block: 8px;
+    }
     .keypad-grid {
       gap: 8px;
     }
@@ -390,18 +437,41 @@ const TEMPLATE_HTML = `
   <style>${TEMPLATE_STYLES}</style>
   <div class="calc-container" part="container">
     <div class="calc-header">
-      <button
-        type="button"
-        class="history-toggle-btn"
-        id="historyToggle"
-        data-action="history-toggle"
-        aria-expanded="false"
-        aria-controls="historyDrawer"
-        aria-label="Toggle calculation history"
-        title="Calculation History"
-      >
-        <span aria-hidden="true">⏱</span> History
-      </button>
+      <div class="header-left">
+        <button
+          type="button"
+          class="mode-toggle-btn"
+          id="modeToggle"
+          data-action="toggle-mode"
+          aria-label="Switch to scientific mode"
+        >
+          <span class="mode-text" id="modeText">Scientific</span>
+        </button>
+        <button
+          type="button"
+          class="angle-unit-toggle-btn"
+          id="angleUnitToggle"
+          data-action="toggle-angle-unit"
+          aria-label="Switch angle unit to radians"
+          style="display: none;"
+        >
+          <span class="angle-unit-indicator" id="angleUnitIndicator">DEG</span>
+        </button>
+      </div>
+      <div class="header-right">
+        <button
+          type="button"
+          class="history-toggle-btn"
+          id="historyToggle"
+          data-action="history-toggle"
+          aria-expanded="false"
+          aria-controls="historyDrawer"
+          aria-label="Toggle calculation history"
+          title="Calculation History"
+        >
+          <span aria-hidden="true">⏱</span> History
+        </button>
+      </div>
     </div>
     <div
       class="history-drawer"
@@ -432,6 +502,16 @@ const TEMPLATE_HTML = `
           <span class="display-value" id="displayValue">0</span>
         </div>
       </slot>
+    </div>
+    <div class="scientific-keys" id="scientificKeys" role="group" aria-label="Scientific Functions" aria-hidden="true" style="display: none;">
+      <button type="button" class="sci-btn" id="btnSqrt" data-action="square-root" aria-label="Square Root">√</button>
+      <button type="button" class="sci-btn" id="btnSquare" data-action="square" aria-label="Square">x²</button>
+      <button type="button" class="sci-btn" id="btnPower" data-action="operator" data-value="^" aria-label="Power">xʸ</button>
+      <button type="button" class="sci-btn" id="btnPi" data-action="constant" data-value="pi" aria-label="Pi">π</button>
+      <button type="button" class="sci-btn" id="btnE" data-action="constant" data-value="e" aria-label="Euler's number">e</button>
+      <button type="button" class="sci-btn" id="btnSin" data-action="sin" aria-label="Sine">sin</button>
+      <button type="button" class="sci-btn" id="btnCos" data-action="cos" aria-label="Cosine">cos</button>
+      <button type="button" class="sci-btn" id="btnTan" data-action="tan" aria-label="Tangent">tan</button>
     </div>
     <div class="keypad-slot-wrapper">
       <slot name="keypad">
@@ -488,9 +568,15 @@ export class StayCalc extends BaseClass {
   private clearHistoryBtn: HTMLElement | null = null;
   private historyEmptyEl: HTMLElement | null = null;
   private historyListEl: HTMLElement | null = null;
+  private modeToggleBtn: HTMLElement | null = null;
+  private modeTextEl: HTMLElement | null = null;
+  private angleUnitToggleBtn: HTMLElement | null = null;
+  private angleUnitIndicatorEl: HTMLElement | null = null;
+  private scientificKeysEl: HTMLElement | null = null;
   private isDrawerOpen = false;
   private isConnectedToDOM = false;
   private lastHistorySnapshot: string = '';
+  private lastModeSnapshot: string = '';
 
   constructor() {
     super();
@@ -500,6 +586,9 @@ export class StayCalc extends BaseClass {
     this.handleHistoryToggleClick = this.handleHistoryToggleClick.bind(this);
     this.handleClearHistoryClick = this.handleClearHistoryClick.bind(this);
     this.handleHistoryDrawerClick = this.handleHistoryDrawerClick.bind(this);
+    this.handleModeToggleClick = this.handleModeToggleClick.bind(this);
+    this.handleAngleUnitToggleClick = this.handleAngleUnitToggleClick.bind(this);
+    this.handleScientificKeysClick = this.handleScientificKeysClick.bind(this);
     this.setupShadowDOM();
   }
 
@@ -522,6 +611,11 @@ export class StayCalc extends BaseClass {
     this.clearHistoryBtn = shadow.querySelector('#clearHistory');
     this.historyEmptyEl = shadow.querySelector('#historyEmpty');
     this.historyListEl = shadow.querySelector('#historyList');
+    this.modeToggleBtn = shadow.querySelector('#modeToggle');
+    this.modeTextEl = shadow.querySelector('#modeText');
+    this.angleUnitToggleBtn = shadow.querySelector('#angleUnitToggle');
+    this.angleUnitIndicatorEl = shadow.querySelector('#angleUnitIndicator');
+    this.scientificKeysEl = shadow.querySelector('#scientificKeys');
   }
 
   public connectedCallback(): void {
@@ -530,6 +624,17 @@ export class StayCalc extends BaseClass {
     // Attach keypad button delegation
     if (this.keypadEl) {
       this.keypadEl.addEventListener('click', this.handleKeypadClick);
+    }
+
+    // Attach mode and angle unit interactions
+    if (this.modeToggleBtn) {
+      this.modeToggleBtn.addEventListener('click', this.handleModeToggleClick);
+    }
+    if (this.angleUnitToggleBtn) {
+      this.angleUnitToggleBtn.addEventListener('click', this.handleAngleUnitToggleClick);
+    }
+    if (this.scientificKeysEl) {
+      this.scientificKeysEl.addEventListener('click', this.handleScientificKeysClick);
     }
 
     // Attach history drawer interactions
@@ -558,6 +663,16 @@ export class StayCalc extends BaseClass {
 
     if (this.keypadEl) {
       this.keypadEl.removeEventListener('click', this.handleKeypadClick);
+    }
+
+    if (this.modeToggleBtn) {
+      this.modeToggleBtn.removeEventListener('click', this.handleModeToggleClick);
+    }
+    if (this.angleUnitToggleBtn) {
+      this.angleUnitToggleBtn.removeEventListener('click', this.handleAngleUnitToggleClick);
+    }
+    if (this.scientificKeysEl) {
+      this.scientificKeysEl.removeEventListener('click', this.handleScientificKeysClick);
     }
 
     if (this.historyToggleBtn) {
@@ -636,6 +751,62 @@ export class StayCalc extends BaseClass {
     return state;
   }
 
+  public toggleMode(): CalculatorState {
+    const state = this.engine.toggleMode();
+    this.syncUI();
+    return state;
+  }
+
+  public toggleAngleUnit(): CalculatorState {
+    const state = this.engine.toggleAngleUnit();
+    this.syncUI();
+    return state;
+  }
+
+  public getMode(): CalculatorMode {
+    return this.engine.getMode();
+  }
+
+  public getAngleUnit(): AngleUnit {
+    return this.engine.getAngleUnit();
+  }
+
+  public squareRoot(): CalculatorState {
+    const state = this.engine.squareRoot();
+    this.syncUI();
+    return state;
+  }
+
+  public square(): CalculatorState {
+    const state = this.engine.square();
+    this.syncUI();
+    return state;
+  }
+
+  public sin(): CalculatorState {
+    const state = this.engine.sin();
+    this.syncUI();
+    return state;
+  }
+
+  public cos(): CalculatorState {
+    const state = this.engine.cos();
+    this.syncUI();
+    return state;
+  }
+
+  public tan(): CalculatorState {
+    const state = this.engine.tan();
+    this.syncUI();
+    return state;
+  }
+
+  public loadConstant(constant: 'pi' | 'e'): CalculatorState {
+    const state = this.engine.loadConstant(constant);
+    this.syncUI();
+    return state;
+  }
+
   public toggleHistoryDrawer(open?: boolean): boolean {
     this.isDrawerOpen = open !== undefined ? open : !this.isDrawerOpen;
     this.syncHistoryDrawerUI();
@@ -692,6 +863,26 @@ export class StayCalc extends BaseClass {
         return this.getState();
       case 'clear-history':
         return this.clearHistory();
+      case 'mode-toggle':
+      case 'toggle-mode':
+        return this.toggleMode();
+      case 'angle-unit-toggle':
+      case 'toggle-angle-unit':
+        return this.toggleAngleUnit();
+      case 'sqrt':
+      case 'square-root':
+        return this.squareRoot();
+      case 'square':
+        return this.square();
+      case 'sin':
+        return this.sin();
+      case 'cos':
+        return this.cos();
+      case 'tan':
+        return this.tan();
+      case 'constant':
+      case 'load-constant':
+        return this.loadConstant((value as 'pi' | 'e') || 'pi');
       default:
         return this.getState();
     }
@@ -699,7 +890,7 @@ export class StayCalc extends BaseClass {
 
   /**
    * Physical keyboard event interceptor complying with RULE-UI-002:
-   * Intercepts 0-9, +, -, *, /, Enter, Backspace, Escape, and .
+   * Intercepts 0-9, +, -, *, /, ^, Enter, Backspace, Escape, and .
    * Leaves browser hotkeys (Cmd, Ctrl, Alt) untouched.
    * Dismisses open history drawer on Escape without clearing calculator state.
    */
@@ -720,7 +911,7 @@ export class StayCalc extends BaseClass {
     } else if (key === '.') {
       intercepted = true;
       this.engine.pressDecimal();
-    } else if (key === '+' || key === '-' || key === '*' || key === '/') {
+    } else if (key === '+' || key === '-' || key === '*' || key === '/' || key === '^') {
       intercepted = true;
       this.engine.pressOperator(key as Operator);
     } else if (key === 'Enter' || key === '=') {
@@ -757,6 +948,35 @@ export class StayCalc extends BaseClass {
     if (!target) return;
 
     const btn = target.closest('button[data-action]') as HTMLElement | null;
+    if (!btn) return;
+
+    const action = btn.getAttribute('data-action');
+    const value = btn.getAttribute('data-value') ?? undefined;
+
+    if (action) {
+      this.pressButton(action, value);
+    }
+  }
+
+  private handleModeToggleClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.toggleMode();
+  }
+
+  private handleAngleUnitToggleClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.toggleAngleUnit();
+  }
+
+  private handleScientificKeysClick(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    const btn = target.closest ? (target.closest('button[data-action]') as HTMLElement | null) : null;
     if (!btn) return;
 
     const action = btn.getAttribute('data-action');
@@ -893,8 +1113,20 @@ export class StayCalc extends BaseClass {
     }
   }
 
+  private dispatchModeEvent(): void {
+    if (typeof this.dispatchEvent === 'function') {
+      const state = this.engine.getState();
+      const modeEvent = new CustomEvent('mode-change', {
+        detail: { mode: state.mode, angleUnit: state.angleUnit },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(modeEvent);
+    }
+  }
+
   /**
-   * Synchronizes visual display, ARIA live region, history drawer, and dispatches events.
+   * Synchronizes visual display, ARIA live region, history drawer, mode indicators, and dispatches events.
    */
   public syncUI(): void {
     const state = this.engine.getState();
@@ -919,6 +1151,53 @@ export class StayCalc extends BaseClass {
         this.defaultDisplayEl.classList.add('error');
       } else {
         this.defaultDisplayEl.classList.remove('error');
+      }
+    }
+
+    // Sync Mode Toggle Button & Text
+    if (this.modeToggleBtn) {
+      const isScientific = state.mode === 'scientific';
+      this.modeToggleBtn.setAttribute(
+        'aria-label',
+        isScientific ? 'Switch to standard mode' : 'Switch to scientific mode'
+      );
+      if (this.modeTextEl) {
+        this.modeTextEl.textContent = isScientific ? 'Standard' : 'Scientific';
+      }
+    }
+
+    // Sync Angle Unit Toggle & Indicator
+    if (this.angleUnitToggleBtn) {
+      const isScientific = state.mode === 'scientific';
+      if (this.angleUnitToggleBtn.style) {
+        this.angleUnitToggleBtn.style.display = isScientific ? 'inline-flex' : 'none';
+      }
+      this.angleUnitToggleBtn.setAttribute(
+        'aria-label',
+        state.angleUnit === 'DEG' ? 'Switch angle unit to radians' : 'Switch angle unit to degrees'
+      );
+      if (isScientific) {
+        this.angleUnitToggleBtn.classList.add('visible');
+      } else {
+        this.angleUnitToggleBtn.classList.remove('visible');
+      }
+    }
+
+    if (this.angleUnitIndicatorEl) {
+      this.angleUnitIndicatorEl.textContent = state.angleUnit;
+    }
+
+    // Sync Scientific Keys Visibility
+    if (this.scientificKeysEl) {
+      const isScientific = state.mode === 'scientific';
+      if (this.scientificKeysEl.style) {
+        this.scientificKeysEl.style.display = isScientific ? 'grid' : 'none';
+      }
+      this.scientificKeysEl.setAttribute('aria-hidden', isScientific ? 'false' : 'true');
+      if (isScientific) {
+        this.scientificKeysEl.classList.add('visible');
+      } else {
+        this.scientificKeysEl.classList.remove('visible');
       }
     }
 
@@ -947,6 +1226,13 @@ export class StayCalc extends BaseClass {
 
     // Sync History Drawer UI
     this.syncHistoryDrawerUI();
+
+    // Check if mode/angleUnit mutated to dispatch mode-change
+    const currentModeSnapshot = `${state.mode}:${state.angleUnit}`;
+    if (currentModeSnapshot !== this.lastModeSnapshot) {
+      this.lastModeSnapshot = currentModeSnapshot;
+      this.dispatchModeEvent();
+    }
 
     // Check if history mutated to dispatch history-change
     const currentHistory = this.engine.getHistory();

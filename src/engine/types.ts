@@ -4,7 +4,10 @@
  * Core type contracts for the StayCalc precision arithmetic engine.
  */
 
-export type Operator = '+' | '-' | '*' | '/';
+export type Operator = '+' | '-' | '*' | '/' | '^';
+
+export type AngleUnit = 'DEG' | 'RAD';
+export type CalculatorMode = 'standard' | 'scientific';
 
 export interface CalculationHistoryEntry {
   readonly id: string;
@@ -27,7 +30,15 @@ export type ActionType =
   | 'MEMORY_RECALL'
   | 'MEMORY_CLEAR'
   | 'CLEAR_HISTORY'
-  | 'LOAD_HISTORY_ENTRY';
+  | 'LOAD_HISTORY_ENTRY'
+  | 'SQUARE_ROOT'
+  | 'SQUARE'
+  | 'SIN'
+  | 'COS'
+  | 'TAN'
+  | 'LOAD_CONSTANT'
+  | 'TOGGLE_ANGLE_UNIT'
+  | 'TOGGLE_MODE';
 
 export interface CalculatorAction {
   readonly type: ActionType;
@@ -35,6 +46,7 @@ export interface CalculatorAction {
   readonly operator?: Operator;
   readonly entry?: CalculationHistoryEntry | string;
   readonly entryId?: string;
+  readonly constant?: 'pi' | 'e';
 }
 
 export interface CalculatorState {
@@ -47,6 +59,8 @@ export interface CalculatorState {
   readonly memory: number;
   readonly hasActiveMemory: boolean;
   readonly history: readonly CalculationHistoryEntry[];
+  readonly mode: CalculatorMode;
+  readonly angleUnit: AngleUnit;
 }
 
 export interface CalculationResult {
