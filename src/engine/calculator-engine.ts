@@ -463,6 +463,21 @@ export function calculatorReducer(
         theme: nextTheme,
       };
     }
+    if (action.type === 'LOAD_BUFFER') {
+      const rawValue = action.value ?? '0';
+      const parsedVal =
+        state.mode === 'programmer'
+          ? parseDisplayToInteger(rawValue, state.radix)
+          : parseFloat(rawValue);
+      return {
+        ...state,
+        display: rawValue,
+        multiRadix: computeMultiRadix(Number.isFinite(parsedVal) ? parsedVal : 0),
+        waitingForOperand: true,
+        error: null,
+        isLocked: false,
+      };
+    }
     if (action.type === 'CLEAR') {
       return {
         ...createInitialState(),
@@ -1220,6 +1235,22 @@ export function calculatorReducer(
       };
     }
 
+    case 'LOAD_BUFFER': {
+      const rawValue = action.value ?? '0';
+      const parsedVal =
+        state.mode === 'programmer'
+          ? parseDisplayToInteger(rawValue, state.radix)
+          : parseFloat(rawValue);
+      return {
+        ...state,
+        display: rawValue,
+        multiRadix: computeMultiRadix(Number.isFinite(parsedVal) ? parsedVal : 0),
+        waitingForOperand: true,
+        error: null,
+        isLocked: false,
+      };
+    }
+
     default:
       return state;
   }
@@ -1412,6 +1443,10 @@ export class CalculatorEngine {
 
   public loadConstant(constant: 'pi' | 'e'): CalculatorState {
     return this.dispatch({ type: 'LOAD_CONSTANT', constant });
+  }
+
+  public loadBuffer(value: string): CalculatorState {
+    return this.dispatch({ type: 'LOAD_BUFFER', value });
   }
 
   /**

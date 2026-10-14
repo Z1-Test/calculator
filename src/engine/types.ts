@@ -79,7 +79,13 @@ export type ActionType =
   | 'BITWISE_NOT'
   | 'INPUT_HEX_DIGIT'
   | 'SET_THEME'
-  | 'CYCLE_THEME';
+  | 'CYCLE_THEME'
+  | 'LOAD_BUFFER';
+
+export interface LoadBufferAction {
+  readonly type: 'LOAD_BUFFER';
+  readonly value: string;
+}
 
 export interface CalculatorAction {
   readonly type: ActionType;
@@ -92,6 +98,7 @@ export interface CalculatorAction {
   readonly mode?: CalculatorMode;
   readonly radix?: Radix;
   readonly theme?: CalculatorTheme;
+  readonly value?: string;
 }
 
 export interface CalculatorState {
@@ -115,5 +122,17 @@ export interface CalculationResult {
   readonly success: boolean;
   readonly value?: number;
   readonly formatted?: string;
+  readonly error?: string;
+}
+
+export type UnitCategory = 'length' | 'mass' | 'temperature';
+export type LengthUnit = 'cm' | 'm' | 'km' | 'in' | 'ft';
+export type MassUnit = 'g' | 'kg' | 'oz' | 'lb';
+export type TemperatureUnit = 'C' | 'F' | 'K';
+export type ConversionUnit = LengthUnit | MassUnit | TemperatureUnit;
+
+export interface ConversionResult {
+  readonly value: number;
+  readonly formatted: string;
   readonly error?: string;
 }

@@ -6,3 +6,4 @@
 
 export * from './types.ts';
 export * from './calculator-engine.ts';
+export * from './converter.ts';
