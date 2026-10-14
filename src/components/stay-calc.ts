@@ -284,6 +284,40 @@ const TEMPLATE_STYLES = `
     transition: border-color 0.15s ease, background-color 0.15s ease;
   }
 
+  .display-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: 20px;
+    gap: 8px;
+  }
+
+  .expression-preview {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--calc-text-secondary, rgba(244, 244, 245, 0.7));
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+    text-align: end;
+    word-break: break-all;
+    user-select: all;
+    min-block-size: 1.25rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :host([data-theme="light"]) .expression-preview {
+    color: rgba(9, 9, 11, 0.7);
+  }
+
+  :host([data-theme="high-contrast"]) .expression-preview {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
   .memory-indicator {
     font-size: 14px;
     font-weight: 700;
@@ -995,6 +1029,9 @@ const TEMPLATE_STYLES = `
       padding-block: 4px;
       font-size: 11px;
     }
+    .expression-preview {
+      font-size: 0.85rem;
+    }
     .converter-drawer {
       padding-inline: 10px;
       padding-block: 8px;
@@ -1303,8 +1340,12 @@ const TEMPLATE_HTML = `
     <div class="display-slot-wrapper">
       <slot name="display">
         <div class="display-screen" id="defaultDisplay" role="status" aria-live="polite" aria-atomic="true">
-          <span class="memory-indicator" id="memoryIndicator" aria-hidden="true">M</span>
+          <div class="display-top-bar">
+            <span class="memory-indicator" id="memoryIndicator" aria-hidden="true">M</span>
+            <div id="expressionPreview" class="expression-preview" role="status" aria-label="Expression preview" aria-live="polite"></div>
+          </div>
           <span class="display-value" id="displayValue">0</span>
+          <span id="display" class="display-value-alias" aria-hidden="true" style="display: none;">0</span>
         </div>
       </slot>
     </div>
@@ -1449,6 +1490,8 @@ export class StayCalc extends BaseClass {
   private engine: CalculatorEngine;
   private defaultDisplayEl: HTMLElement | null = null;
   private displayValueEl: HTMLElement | null = null;
+  private displayAliasEl: HTMLElement | null = null;
+  private expressionPreviewEl: HTMLElement | null = null;
   private memoryIndicatorEl: HTMLElement | null = null;
   private keypadEl: HTMLElement | null = null;
   private historyToggleBtn: HTMLElement | null = null;
@@ -1528,6 +1571,8 @@ export class StayCalc extends BaseClass {
 
     this.defaultDisplayEl = shadow.querySelector('#defaultDisplay');
     this.displayValueEl = shadow.querySelector('#displayValue');
+    this.displayAliasEl = shadow.querySelector('#display');
+    this.expressionPreviewEl = shadow.querySelector('#expressionPreview');
     this.memoryIndicatorEl = shadow.querySelector('#memoryIndicator');
     this.keypadEl = shadow.querySelector('#defaultKeypad');
     this.historyToggleBtn = shadow.querySelector('#historyToggle');
@@ -1746,6 +1791,13 @@ export class StayCalc extends BaseClass {
    */
   public getState(): CalculatorState {
     return this.engine.getState();
+  }
+
+  /**
+   * Returns running formula expression preview string.
+   */
+  public getExpression(): string {
+    return this.engine.getExpression();
   }
 
   /**
@@ -2622,6 +2674,12 @@ export class StayCalc extends BaseClass {
 
     if (this.displayValueEl) {
       this.displayValueEl.textContent = state.display;
+    }
+    if (this.displayAliasEl) {
+      this.displayAliasEl.textContent = state.display;
+    }
+    if (this.expressionPreviewEl) {
+      this.expressionPreviewEl.textContent = state.expression;
     }
 
     if (this.memoryIndicatorEl) {
