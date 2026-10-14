@@ -27,6 +27,8 @@ import type {
   CalculatorAction,
   CalculatorState,
   CalculationHistoryEntry,
+  HistoryExportFormat,
+  HistoryExportResult,
   Operator,
   CalculatorMode,
   AngleUnit,
@@ -64,6 +66,7 @@ const TEMPLATE_STYLES = `
   }
 
   .calc-container {
+    position: relative;
     inline-size: 100%;
     padding-inline: 16px;
     padding-block: 20px;
@@ -508,6 +511,72 @@ const TEMPLATE_STYLES = `
     outline-offset: 1px;
   }
 
+  .history-actions-bar {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    inline-size: 100%;
+    box-sizing: border-box;
+  }
+
+  .history-action-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    background-color: var(--calc-container-high, #ffffff);
+    color: var(--calc-text-primary, #09090b);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding-inline: 8px;
+    padding-block: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    box-sizing: border-box;
+  }
+
+  .history-action-btn:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+    border-color: var(--calc-primary, #2563eb);
+  }
+
+  .history-action-btn:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 1px;
+  }
+
+  .history-action-btn:active {
+    transform: scale(0.97);
+  }
+
+  .toast-notification {
+    display: none;
+    position: absolute;
+    inset-inline-start: 50%;
+    inset-block-end: 16px;
+    transform: translateX(-50%);
+    background-color: var(--calc-container-lowest, #18181b);
+    color: var(--calc-on-primary, #ffffff);
+    font-size: 12px;
+    font-weight: 600;
+    padding-inline: 14px;
+    padding-block: 8px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 20;
+    pointer-events: none;
+    text-align: center;
+    max-inline-size: calc(100% - 32px);
+    word-break: break-word;
+    box-sizing: border-box;
+  }
+
+  .toast-notification.show {
+    display: block;
+  }
+
   .history-empty {
     font-size: 13px;
     color: var(--calc-text-secondary, #71717a);
@@ -575,6 +644,20 @@ const TEMPLATE_STYLES = `
       max-block-size: 200px;
       padding-inline: 10px;
       padding-block: 8px;
+    }
+    .history-actions-bar {
+      gap: 4px;
+    }
+    .history-action-btn {
+      font-size: 10px;
+      padding-inline: 4px;
+      padding-block: 5px;
+    }
+    .toast-notification {
+      font-size: 11px;
+      padding-inline: 10px;
+      padding-block: 6px;
+      inset-block-end: 10px;
     }
     .history-entry-result {
       font-size: 15px;
@@ -694,6 +777,44 @@ const TEMPLATE_HTML = `
           aria-label="Clear calculation history"
         >
           Clear
+        </button>
+      </div>
+      <div class="history-actions-bar" id="historyActionsBar" role="toolbar" aria-label="History Actions">
+        <button
+          type="button"
+          class="history-action-btn"
+          id="btnCopyResult"
+          data-action="copy-result"
+          aria-label="Copy active result to clipboard"
+        >
+          Copy Result
+        </button>
+        <button
+          type="button"
+          class="history-action-btn"
+          id="btnCopyHistory"
+          data-action="copy-history"
+          aria-label="Copy full history tape to clipboard"
+        >
+          Copy History
+        </button>
+        <button
+          type="button"
+          class="history-action-btn"
+          id="btnExportTxt"
+          data-action="export-txt"
+          aria-label="Export history tape as text"
+        >
+          Export TXT
+        </button>
+        <button
+          type="button"
+          class="history-action-btn"
+          id="btnExportCsv"
+          data-action="export-csv"
+          aria-label="Export history tape as CSV"
+        >
+          Export CSV
         </button>
       </div>
       <div class="history-empty" id="historyEmpty">No calculations yet</div>
@@ -828,6 +949,13 @@ const TEMPLATE_HTML = `
         </div>
       </slot>
     </div>
+    <div
+      class="toast-notification"
+      id="toastNotification"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
   </div>
 `;
 
@@ -858,6 +986,13 @@ export class StayCalc extends BaseClass {
   private radixSelectorEl: HTMLElement | null = null;
   private multiRadixPreviewEl: HTMLElement | null = null;
   private programmerKeysEl: HTMLElement | null = null;
+  private btnCopyResult: HTMLElement | null = null;
+  private btnCopyHistory: HTMLElement | null = null;
+  private btnExportTxt: HTMLElement | null = null;
+  private btnExportCsv: HTMLElement | null = null;
+  private historyActionsBarEl: HTMLElement | null = null;
+  private toastNotificationEl: HTMLElement | null = null;
+  private toastTimer: any = null;
   private isDrawerOpen = false;
   private isConnectedToDOM = false;
   private lastHistorySnapshot: string = '';
@@ -871,6 +1006,10 @@ export class StayCalc extends BaseClass {
     this.handleHistoryToggleClick = this.handleHistoryToggleClick.bind(this);
     this.handleClearHistoryClick = this.handleClearHistoryClick.bind(this);
     this.handleHistoryDrawerClick = this.handleHistoryDrawerClick.bind(this);
+    this.handleCopyResultClick = this.handleCopyResultClick.bind(this);
+    this.handleCopyHistoryClick = this.handleCopyHistoryClick.bind(this);
+    this.handleExportTxtClick = this.handleExportTxtClick.bind(this);
+    this.handleExportCsvClick = this.handleExportCsvClick.bind(this);
     this.handleModeToggleClick = this.handleModeToggleClick.bind(this);
     this.handleProgrammerToggleClick = this.handleProgrammerToggleClick.bind(this);
     this.handleAngleUnitToggleClick = this.handleAngleUnitToggleClick.bind(this);
@@ -908,6 +1047,12 @@ export class StayCalc extends BaseClass {
     this.radixSelectorEl = shadow.querySelector('#radixSelector');
     this.multiRadixPreviewEl = shadow.querySelector('#multiRadixPreview');
     this.programmerKeysEl = shadow.querySelector('#programmerKeys');
+    this.btnCopyResult = shadow.querySelector('#btnCopyResult');
+    this.btnCopyHistory = shadow.querySelector('#btnCopyHistory');
+    this.btnExportTxt = shadow.querySelector('#btnExportTxt');
+    this.btnExportCsv = shadow.querySelector('#btnExportCsv');
+    this.historyActionsBarEl = shadow.querySelector('#historyActionsBar');
+    this.toastNotificationEl = shadow.querySelector('#toastNotification');
   }
 
   public connectedCallback(): void {
@@ -928,6 +1073,18 @@ export class StayCalc extends BaseClass {
     }
     if (this.historyDrawerEl) {
       this.historyDrawerEl.addEventListener('click', this.handleHistoryDrawerClick);
+    }
+    if (this.btnCopyResult) {
+      this.btnCopyResult.addEventListener('click', this.handleCopyResultClick);
+    }
+    if (this.btnCopyHistory) {
+      this.btnCopyHistory.addEventListener('click', this.handleCopyHistoryClick);
+    }
+    if (this.btnExportTxt) {
+      this.btnExportTxt.addEventListener('click', this.handleExportTxtClick);
+    }
+    if (this.btnExportCsv) {
+      this.btnExportCsv.addEventListener('click', this.handleExportCsvClick);
     }
     if (this.modeToggleBtn) {
       this.modeToggleBtn.addEventListener('click', this.handleModeToggleClick);
@@ -963,6 +1120,11 @@ export class StayCalc extends BaseClass {
   public disconnectedCallback(): void {
     this.isConnectedToDOM = false;
 
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+
     if (this.keypadEl) {
       this.keypadEl.removeEventListener('click', this.handleKeypadClick);
     }
@@ -996,6 +1158,18 @@ export class StayCalc extends BaseClass {
     if (this.historyDrawerEl) {
       this.historyDrawerEl.removeEventListener('click', this.handleHistoryDrawerClick);
     }
+    if (this.btnCopyResult) {
+      this.btnCopyResult.removeEventListener('click', this.handleCopyResultClick);
+    }
+    if (this.btnCopyHistory) {
+      this.btnCopyHistory.removeEventListener('click', this.handleCopyHistoryClick);
+    }
+    if (this.btnExportTxt) {
+      this.btnExportTxt.removeEventListener('click', this.handleExportTxtClick);
+    }
+    if (this.btnExportCsv) {
+      this.btnExportCsv.removeEventListener('click', this.handleExportCsvClick);
+    }
 
     if (typeof globalThis.window !== 'undefined' && globalThis.window.removeEventListener) {
       globalThis.window.removeEventListener('keydown', this.handleKeyDown);
@@ -1015,6 +1189,17 @@ export class StayCalc extends BaseClass {
    * Resets engine state and visual display back to initial clean state.
    */
   public reset(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+    if (this.toastNotificationEl) {
+      this.toastNotificationEl.textContent = '';
+      this.toastNotificationEl.classList.remove('show');
+      if (this.toastNotificationEl.style) {
+        this.toastNotificationEl.style.display = 'none';
+      }
+    }
     this.engine = new CalculatorEngine();
     this.isDrawerOpen = false;
     this.syncUI();
@@ -1216,6 +1401,18 @@ export class StayCalc extends BaseClass {
         return this.getState();
       case 'clear-history':
         return this.clearHistory();
+      case 'copy-result':
+        this.copyResult();
+        return this.getState();
+      case 'copy-history':
+        this.copyHistory();
+        return this.getState();
+      case 'export-txt':
+        this.exportHistory('text');
+        return this.getState();
+      case 'export-csv':
+        this.exportHistory('csv');
+        return this.getState();
       case 'mode-toggle':
       case 'toggle-mode':
         return this.toggleMode();
@@ -1481,6 +1678,22 @@ export class StayCalc extends BaseClass {
 
     if (target.closest && target.closest('#clearHistory')) {
       this.clearHistory();
+      return;
+    }
+    if (target.closest && target.closest('#btnCopyResult')) {
+      this.copyResult();
+      return;
+    }
+    if (target.closest && target.closest('#btnCopyHistory')) {
+      this.copyHistory();
+      return;
+    }
+    if (target.closest && target.closest('#btnExportTxt')) {
+      this.exportHistory('text');
+      return;
+    }
+    if (target.closest && target.closest('#btnExportCsv')) {
+      this.exportHistory('csv');
       return;
     }
 
@@ -1888,6 +2101,158 @@ export class StayCalc extends BaseClass {
       });
       this.dispatchEvent(changeEvent);
     }
+  }
+
+  private handleCopyResultClick(e?: Event): void {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    this.copyResult();
+  }
+
+  private handleCopyHistoryClick(e?: Event): void {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    this.copyHistory();
+  }
+
+  private handleExportTxtClick(e?: Event): void {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    this.exportHistory('text');
+  }
+
+  private handleExportCsvClick(e?: Event): void {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    this.exportHistory('csv');
+  }
+
+  /**
+   * Accessible toast notification helper with auto-dismiss and debounce timer reset.
+   */
+  public showToast(message: string, duration: number = 2000): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+
+    if (!this.toastNotificationEl) {
+      return;
+    }
+
+    this.toastNotificationEl.textContent = message;
+    this.toastNotificationEl.classList.add('show');
+    if (this.toastNotificationEl.style) {
+      this.toastNotificationEl.style.display = 'block';
+    }
+
+    this.toastTimer = setTimeout(() => {
+      if (this.toastNotificationEl) {
+        this.toastNotificationEl.textContent = '';
+        this.toastNotificationEl.classList.remove('show');
+        if (this.toastNotificationEl.style) {
+          this.toastNotificationEl.style.display = 'none';
+        }
+      }
+      this.toastTimer = null;
+    }, duration);
+  }
+
+  /**
+   * Safe asynchronous clipboard copy wrapper.
+   * Gracefully catches rejection/unsupported environments without throwing runtime errors.
+   * Dispatches 'copy-clipboard' CustomEvent.
+   */
+  public async copyToClipboard(text: string, type?: 'result' | 'history'): Promise<boolean> {
+    let success = false;
+    try {
+      if (typeof globalThis.navigator !== 'undefined' && globalThis.navigator.clipboard?.writeText) {
+        await globalThis.navigator.clipboard.writeText(text);
+        success = true;
+      } else {
+        success = false;
+      }
+    } catch {
+      // Gracefully handled without throwing (REC-EXP-02)
+      success = false;
+    }
+
+    if (typeof this.dispatchEvent === 'function') {
+      const detail: { text: string; success: boolean; type?: 'result' | 'history' } = { text, success };
+      if (type) detail.type = type;
+      this.dispatchEvent(
+        new CustomEvent('copy-clipboard', {
+          detail,
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
+
+    return success;
+  }
+
+  /**
+   * Copies the active display result to the clipboard.
+   */
+  public async copyResult(): Promise<boolean> {
+    const state = this.engine.getState();
+    const textToCopy = state.display;
+    this.showToast('Result copied to clipboard', 2000);
+    const success = await this.copyToClipboard(textToCopy, 'result');
+    return success;
+  }
+
+  /**
+   * Copies the full formatted calculation history tape to the clipboard.
+   */
+  public async copyHistory(): Promise<boolean> {
+    const history = this.engine.getHistory();
+    if (history.length === 0) {
+      this.showToast('No history to copy', 2000);
+      return false;
+    }
+    const textToCopy = this.engine.exportHistoryAsText();
+    this.showToast('History copied to clipboard', 2000);
+    const success = await this.copyToClipboard(textToCopy, 'history');
+    return success;
+  }
+
+  /**
+   * Exports calculation history in either 'text' or 'csv' format.
+   * Dispatches 'export-history' CustomEvent.
+   */
+  public exportHistory(format: HistoryExportFormat = 'text'): HistoryExportResult | null {
+    const history = this.engine.getHistory();
+    if (history.length === 0) {
+      this.showToast('No history to export', 2000);
+      return null;
+    }
+
+    const res = this.engine.exportHistory(format);
+    if (typeof this.dispatchEvent === 'function') {
+      this.dispatchEvent(
+        new CustomEvent('export-history', {
+          detail: res,
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
+
+    const toastMsg = format === 'csv' ? 'History exported as CSV' : 'History exported as TXT';
+    this.showToast(toastMsg, 2000);
+    return res;
+  }
+
+  /**
+   * Convenience facade to export history as Plain Text.
+   */
+  public exportHistoryAsText(): HistoryExportResult | null {
+    return this.exportHistory('text');
+  }
+
+  /**
+   * Convenience facade to export history as CSV.
+   */
+  public exportHistoryAsCsv(): HistoryExportResult | null {
+    return this.exportHistory('csv');
   }
 }
 

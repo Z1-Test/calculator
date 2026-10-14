@@ -19,6 +19,8 @@ import type {
   CalculatorState,
   CalculationResult,
   CalculationHistoryEntry,
+  HistoryExportFormat,
+  HistoryExportResult,
   Operator,
   CalculatorMode,
   AngleUnit,
@@ -141,6 +143,37 @@ export function normalizePrecision(n: number, maxDigits: number = MAX_DISPLAY_DI
 
   return rawStr;
 }
+
+/**
+ * Formats calculation history tape into plain text audit format.
+ */
+export function exportHistoryToText(history: readonly CalculationHistoryEntry[]): string {
+  const total = history.reduce((acc, entry) => {
+    const val = parseFloat(entry.result);
+    return acc + (Number.isFinite(val) ? val : 0);
+  }, 0);
+
+  const lines: string[] = ['--- StayCalc Calculation History ---'];
+  history.forEach((entry, index) => {
+    const iso = new Date(entry.timestamp).toISOString();
+    lines.push(`[${index + 1}] ${entry.expression} = ${entry.result} (${iso})`);
+  });
+  lines.push(`Total calculations: ${history.length} | Summary total: ${formatNumber(total)}`);
+  return lines.join('\n');
+}
+
+/**
+ * Formats calculation history tape into RFC-compliant CSV format.
+ */
+export function exportHistoryToCsv(history: readonly CalculationHistoryEntry[]): string {
+  const lines: string[] = ['"Index","Expression","Result","Timestamp","ISO"'];
+  history.forEach((entry, index) => {
+    const iso = new Date(entry.timestamp).toISOString();
+    lines.push(`${index + 1},"${entry.expression}","${entry.result}",${entry.timestamp},"${iso}"`);
+  });
+  return lines.join('\n');
+}
+
 
 /**
  * Pure evaluation function for basic binary arithmetic and bitwise operations.
@@ -1235,6 +1268,30 @@ export class CalculatorEngine {
     }
     return this.dispatch({ type: 'LOAD_HISTORY_ENTRY', entry: entryOrId });
   }
+
+  public exportHistoryAsText(): string {
+    return exportHistoryToText(this.state.history);
+  }
+
+  public exportHistoryAsCsv(): string {
+    return exportHistoryToCsv(this.state.history);
+  }
+
+  public exportHistory(format: HistoryExportFormat = 'text'): HistoryExportResult {
+    const history = this.state.history;
+    const content = format === 'csv' ? this.exportHistoryAsCsv() : this.exportHistoryAsText();
+    const total = history.reduce((acc, entry) => {
+      const val = parseFloat(entry.result);
+      return acc + (Number.isFinite(val) ? val : 0);
+    }, 0);
+    return {
+      format: format === 'csv' ? 'csv' : 'text',
+      content,
+      count: history.length,
+      total: parseFloat(formatNumber(total)),
+    };
+  }
+
 
   public setMode(mode: CalculatorMode): CalculatorState {
     return this.dispatch({ type: 'SET_MODE', mode });
