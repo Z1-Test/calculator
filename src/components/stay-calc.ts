@@ -34,23 +34,68 @@ import type {
   AngleUnit,
   Radix,
   MultiRadixValues,
+  CalculatorTheme,
 } from '../engine/types.ts';
+
+export const THEME_STORAGE_KEY = 'staycalc_theme';
+
+/**
+ * Safely reads the persisted theme from localStorage with graceful exception fallback.
+ */
+export function getStoredTheme(): CalculatorTheme | null {
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+      const val = globalThis.localStorage.getItem(THEME_STORAGE_KEY);
+      if (val === 'dark' || val === 'light' || val === 'high-contrast') {
+        return val as CalculatorTheme;
+      }
+    }
+  } catch {
+    // Ignore restricted localStorage security or permission errors
+  }
+  return null;
+}
+
+/**
+ * Safely writes the selected theme to localStorage with graceful exception fallback.
+ */
+export function setStoredTheme(theme: CalculatorTheme): void {
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+      globalThis.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+  } catch {
+    // Ignore restricted localStorage security or quota errors
+  }
+}
 
 const TEMPLATE_STYLES = `
   :host {
-    --calc-primary: #2563eb;
+    /* Design Tokens - Dark (Default) */
+    --calc-bg: #18181b;
+    --calc-surface: #27272a;
+    --calc-text: #f4f4f5;
+    --calc-btn-bg: #27272a;
+    --calc-btn-text: #f4f4f5;
+    --calc-btn-op-bg: #3f3f46;
+    --calc-accent-bg: #2563eb;
+    --calc-border: #3f3f46;
+    --calc-focus-ring: #3b82f6;
+
+    /* Semantic Compatibility Mappings */
+    --calc-background: var(--calc-bg);
+    --calc-primary: var(--calc-accent-bg);
     --calc-on-primary: #ffffff;
-    --calc-secondary: #475569;
-    --calc-tertiary: #f4f4f5;
-    --calc-background: #ffffff;
-    --calc-surface: #f4f4f5;
-    --calc-container-high: #ffffff;
-    --calc-container-medium: #f4f4f5;
-    --calc-container-low: #e4e4e7;
-    --calc-text-primary: #09090b;
-    --calc-text-secondary: #71717a;
-    --calc-outline-low: #e4e4e7;
+    --calc-secondary: #a1a1aa;
+    --calc-tertiary: var(--calc-surface);
+    --calc-container-high: var(--calc-btn-bg);
+    --calc-container-medium: var(--calc-surface);
+    --calc-container-low: var(--calc-btn-op-bg);
+    --calc-text-primary: var(--calc-text);
+    --calc-text-secondary: #a1a1aa;
+    --calc-outline-low: var(--calc-border);
     --calc-error: #ff453a;
+
     display: block;
     box-sizing: border-box;
     inline-size: 100%;
@@ -59,6 +104,126 @@ const TEMPLATE_STYLES = `
     font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     container-type: inline-size;
     container-name: calc-host;
+  }
+
+  :host([data-theme="dark"]) {
+    --calc-bg: #18181b;
+    --calc-surface: #27272a;
+    --calc-text: #f4f4f5;
+    --calc-btn-bg: #27272a;
+    --calc-btn-text: #f4f4f5;
+    --calc-btn-op-bg: #3f3f46;
+    --calc-accent-bg: #2563eb;
+    --calc-border: #3f3f46;
+    --calc-focus-ring: #3b82f6;
+
+    --calc-background: var(--calc-bg);
+    --calc-primary: var(--calc-accent-bg);
+    --calc-on-primary: #ffffff;
+    --calc-secondary: #a1a1aa;
+    --calc-tertiary: var(--calc-surface);
+    --calc-container-high: var(--calc-btn-bg);
+    --calc-container-medium: var(--calc-surface);
+    --calc-container-low: var(--calc-btn-op-bg);
+    --calc-text-primary: var(--calc-text);
+    --calc-text-secondary: #a1a1aa;
+    --calc-outline-low: var(--calc-border);
+    --calc-error: #ff453a;
+  }
+
+  :host([data-theme="light"]) {
+    /* Design Tokens - Light */
+    --calc-bg: #ffffff;
+    --calc-surface: #f4f4f5;
+    --calc-text: #09090b;
+    --calc-btn-bg: #ffffff;
+    --calc-btn-text: #09090b;
+    --calc-btn-op-bg: #f4f4f5;
+    --calc-accent-bg: #2563eb;
+    --calc-border: #e4e4e7;
+    --calc-focus-ring: #2563eb;
+
+    /* Semantic Compatibility Mappings */
+    --calc-background: var(--calc-bg);
+    --calc-primary: var(--calc-accent-bg);
+    --calc-on-primary: #ffffff;
+    --calc-secondary: #475569;
+    --calc-tertiary: #f4f4f5;
+    --calc-container-high: var(--calc-btn-bg);
+    --calc-container-medium: var(--calc-surface);
+    --calc-container-low: #e4e4e7;
+    --calc-text-primary: var(--calc-text);
+    --calc-text-secondary: #71717a;
+    --calc-outline-low: var(--calc-border);
+    --calc-error: #ff453a;
+  }
+
+  :host([data-theme="high-contrast"]) {
+    /* Design Tokens - High-Contrast (WCAG 2.2 AAA 21:1 Contrast) */
+    --calc-bg: #000000;
+    --calc-surface: #000000;
+    --calc-text: #ffffff;
+    --calc-btn-bg: #000000;
+    --calc-btn-text: #ffffff;
+    --calc-btn-op-bg: #000000;
+    --calc-accent-bg: #000000;
+    --calc-border: #ffffff;
+    --calc-focus-ring: #ffff00;
+
+    /* Semantic Compatibility Mappings */
+    --calc-background: var(--calc-bg);
+    --calc-primary: #ffffff;
+    --calc-on-primary: #000000;
+    --calc-secondary: #ffffff;
+    --calc-tertiary: #000000;
+    --calc-container-high: #000000;
+    --calc-container-medium: #000000;
+    --calc-container-low: #18181b;
+    --calc-text-primary: var(--calc-text);
+    --calc-text-secondary: #ffffff;
+    --calc-outline-low: var(--calc-border);
+    --calc-error: #ff5555;
+  }
+
+  /* High-Contrast WCAG 2.2 AAA prominent 2px solid #ffffff borders and 21:1 text contrast */
+  :host([data-theme="high-contrast"]) .calc-container,
+  :host([data-theme="high-contrast"]) .display-screen,
+  :host([data-theme="high-contrast"]) .calc-btn,
+  :host([data-theme="high-contrast"]) .sci-btn,
+  :host([data-theme="high-contrast"]) .prog-btn,
+  :host([data-theme="high-contrast"]) .radix-btn,
+  :host([data-theme="high-contrast"]) .mode-toggle-btn,
+  :host([data-theme="high-contrast"]) .angle-unit-toggle-btn,
+  :host([data-theme="high-contrast"]) .history-toggle-btn,
+  :host([data-theme="high-contrast"]) .theme-toggle-btn,
+  :host([data-theme="high-contrast"]) .multi-radix-preview,
+  :host([data-theme="high-contrast"]) .history-drawer,
+  :host([data-theme="high-contrast"]) .history-action-btn,
+  :host([data-theme="high-contrast"]) .clear-history-btn,
+  :host([data-theme="high-contrast"]) .history-entry,
+  :host([data-theme="high-contrast"]) .toast-notification {
+    border: 2px solid #ffffff;
+  }
+
+  :host([data-theme="high-contrast"]) .btn-equals {
+    background-color: #000000;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+  }
+
+  :host([data-theme="high-contrast"]) .calc-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .sci-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .prog-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .radix-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .mode-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .angle-unit-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .history-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .theme-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .history-action-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .clear-history-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .history-entry:focus-visible {
+    outline: 2px solid #ffff00;
+    outline-offset: 2px;
   }
 
   *, *::before, *::after {
@@ -150,7 +315,7 @@ const TEMPLATE_STYLES = `
     gap: 6px;
   }
 
-  .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn {
+  .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn {
     appearance: none;
     -webkit-appearance: none;
     border: 1px solid var(--calc-outline-low, #e4e4e7);
@@ -166,16 +331,22 @@ const TEMPLATE_STYLES = `
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
 
-  .mode-toggle-btn:hover, .angle-unit-toggle-btn:hover, .history-toggle-btn:hover {
+  .mode-toggle-btn:hover, .angle-unit-toggle-btn:hover, .history-toggle-btn:hover, .theme-toggle-btn:hover {
     background-color: var(--calc-container-low, #e4e4e7);
   }
 
-  .mode-toggle-btn:focus-visible, .angle-unit-toggle-btn:focus-visible, .history-toggle-btn:focus-visible {
-    outline: 2px solid var(--calc-primary, #2563eb);
+  .mode-toggle-btn:focus-visible, .angle-unit-toggle-btn:focus-visible, .history-toggle-btn:focus-visible, .theme-toggle-btn:focus-visible {
+    outline: 2px solid var(--calc-focus-ring, var(--calc-primary, #2563eb));
     outline-offset: 2px;
+  }
+
+  .theme-icon {
+    font-size: 13px;
+    line-height: 1;
+    display: inline-block;
   }
 
   .mode-toggle-btn.active, .mode-toggle-btn[aria-pressed="true"] {
@@ -446,9 +617,9 @@ const TEMPLATE_STYLES = `
 
   /* Disabled buttons styling for dynamic keypad gating */
   button:disabled, button[disabled], button[aria-disabled="true"] {
-    opacity: 0.35 !important;
-    cursor: not-allowed !important;
-    pointer-events: none !important;
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   /* History Drawer */
@@ -640,6 +811,17 @@ const TEMPLATE_STYLES = `
       padding-block: 12px;
       gap: 10px;
     }
+    .calc-header {
+      gap: 4px;
+    }
+    .header-left, .header-right {
+      gap: 4px;
+    }
+    .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn {
+      padding-inline: 6px;
+      padding-block: 4px;
+      font-size: 11px;
+    }
     .history-drawer {
       max-block-size: 200px;
       padding-inline: 10px;
@@ -746,6 +928,17 @@ const TEMPLATE_HTML = `
         </button>
       </div>
       <div class="header-right">
+        <button
+          type="button"
+          class="theme-toggle-btn"
+          id="themeToggle"
+          data-action="cycle-theme"
+          aria-label="Switch visual theme, current theme: dark"
+          aria-haspopup="false"
+          title="Switch visual theme"
+        >
+          <span class="theme-icon" id="themeIcon" aria-hidden="true">🌙</span>
+        </button>
         <button
           type="button"
           class="history-toggle-btn"
@@ -992,6 +1185,8 @@ export class StayCalc extends BaseClass {
   private btnExportCsv: HTMLElement | null = null;
   private historyActionsBarEl: HTMLElement | null = null;
   private toastNotificationEl: HTMLElement | null = null;
+  private themeToggleBtn: HTMLElement | null = null;
+  private themeIconEl: HTMLElement | null = null;
   private toastTimer: any = null;
   private isDrawerOpen = false;
   private isConnectedToDOM = false;
@@ -1003,6 +1198,7 @@ export class StayCalc extends BaseClass {
     this.engine = new CalculatorEngine();
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeypadClick = this.handleKeypadClick.bind(this);
+    this.handleThemeToggleClick = this.handleThemeToggleClick.bind(this);
     this.handleHistoryToggleClick = this.handleHistoryToggleClick.bind(this);
     this.handleClearHistoryClick = this.handleClearHistoryClick.bind(this);
     this.handleHistoryDrawerClick = this.handleHistoryDrawerClick.bind(this);
@@ -1053,6 +1249,8 @@ export class StayCalc extends BaseClass {
     this.btnExportCsv = shadow.querySelector('#btnExportCsv');
     this.historyActionsBarEl = shadow.querySelector('#historyActionsBar');
     this.toastNotificationEl = shadow.querySelector('#toastNotification');
+    this.themeToggleBtn = shadow.querySelector('#themeToggle');
+    this.themeIconEl = shadow.querySelector('#themeIcon');
   }
 
   public connectedCallback(): void {
@@ -1061,9 +1259,25 @@ export class StayCalc extends BaseClass {
       this.setupShadowDOM();
     }
 
+    // Hydrate theme from data-theme attribute or localStorage on mount
+    const hostAttrTheme = typeof this.getAttribute === 'function' ? (this.getAttribute('data-theme') as CalculatorTheme | null) : null;
+    const storedTheme = getStoredTheme();
+    const effectiveTheme: CalculatorTheme =
+      (hostAttrTheme === 'dark' || hostAttrTheme === 'light' || hostAttrTheme === 'high-contrast')
+        ? hostAttrTheme
+        : (storedTheme ?? this.engine.getTheme());
+
+    this.engine.setTheme(effectiveTheme);
+    if (typeof this.setAttribute === 'function') {
+      this.setAttribute('data-theme', effectiveTheme);
+    }
+
     // Attach event listeners
     if (this.keypadEl) {
       this.keypadEl.addEventListener('click', this.handleKeypadClick);
+    }
+    if (this.themeToggleBtn) {
+      this.themeToggleBtn.addEventListener('click', this.handleThemeToggleClick);
     }
     if (this.historyToggleBtn) {
       this.historyToggleBtn.addEventListener('click', this.handleHistoryToggleClick);
@@ -1127,6 +1341,9 @@ export class StayCalc extends BaseClass {
 
     if (this.keypadEl) {
       this.keypadEl.removeEventListener('click', this.handleKeypadClick);
+    }
+    if (this.themeToggleBtn) {
+      this.themeToggleBtn.removeEventListener('click', this.handleThemeToggleClick);
     }
     if (this.modeToggleBtn) {
       this.modeToggleBtn.removeEventListener('click', this.handleModeToggleClick);
@@ -1200,8 +1417,12 @@ export class StayCalc extends BaseClass {
         this.toastNotificationEl.style.display = 'none';
       }
     }
-    this.engine = new CalculatorEngine();
+    const currentTheme = this.engine.getTheme();
+    this.engine = new CalculatorEngine({ theme: currentTheme });
     this.isDrawerOpen = false;
+    if (typeof this.setAttribute === 'function') {
+      this.setAttribute('data-theme', currentTheme);
+    }
     this.syncUI();
   }
 
@@ -1209,7 +1430,23 @@ export class StayCalc extends BaseClass {
    * Dispatches a strongly-typed action to the engine, synchronizes UI, and emits change event.
    */
   public dispatch(action: CalculatorAction): CalculatorState {
+    const previousTheme = this.engine.getTheme();
     const newState = this.engine.dispatch(action);
+    if (newState.theme !== previousTheme) {
+      if (typeof this.setAttribute === 'function') {
+        this.setAttribute('data-theme', newState.theme);
+      }
+      setStoredTheme(newState.theme);
+      if (typeof this.dispatchEvent === 'function') {
+        this.dispatchEvent(
+          new CustomEvent('theme-change', {
+            detail: { theme: newState.theme, previousTheme },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
+    }
     this.syncUI();
     return newState;
   }
@@ -1274,6 +1511,56 @@ export class StayCalc extends BaseClass {
 
   public getMode(): CalculatorMode {
     return this.engine.getMode();
+  }
+
+  /**
+   * Returns the active visual theme ('dark' | 'light' | 'high-contrast').
+   */
+  public getTheme(): CalculatorTheme {
+    return this.engine.getTheme();
+  }
+
+  /**
+   * Sets the active visual theme, updates data-theme attribute, persists in localStorage, and dispatches theme-change event.
+   */
+  public setTheme(theme: CalculatorTheme): void {
+    if (theme !== 'dark' && theme !== 'light' && theme !== 'high-contrast') {
+      return;
+    }
+    const previousTheme = this.engine.getTheme();
+    this.engine.setTheme(theme);
+    if (typeof this.setAttribute === 'function') {
+      this.setAttribute('data-theme', theme);
+    }
+    setStoredTheme(theme);
+    this.syncThemeUI();
+
+    if (theme !== previousTheme && typeof this.dispatchEvent === 'function') {
+      this.dispatchEvent(
+        new CustomEvent('theme-change', {
+          detail: { theme, previousTheme },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
+  }
+
+  /**
+   * Cycles visual theme in sequence: dark -> light -> high-contrast -> dark.
+   */
+  public cycleTheme(): CalculatorTheme {
+    const previousTheme = this.engine.getTheme();
+    let nextTheme: CalculatorTheme;
+    if (previousTheme === 'dark') {
+      nextTheme = 'light';
+    } else if (previousTheme === 'light') {
+      nextTheme = 'high-contrast';
+    } else {
+      nextTheme = 'dark';
+    }
+    this.setTheme(nextTheme);
+    return nextTheme;
   }
 
   public getAngleUnit(): AngleUnit {
@@ -1575,6 +1862,13 @@ export class StayCalc extends BaseClass {
     if (action) {
       this.pressButton(action, value);
     }
+  }
+
+  private handleThemeToggleClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.cycleTheme();
   }
 
   private handleModeToggleClick(event: Event): void {
@@ -2074,6 +2368,9 @@ export class StayCalc extends BaseClass {
       }
     }
 
+    // Sync Theme UI
+    this.syncThemeUI();
+
     // Sync History Drawer UI
     this.syncHistoryDrawerUI();
 
@@ -2100,6 +2397,29 @@ export class StayCalc extends BaseClass {
         composed: true,
       });
       this.dispatchEvent(changeEvent);
+    }
+  }
+
+  /**
+   * Synchronizes theme toggle button accessibility attributes, data-theme, and visual indicator.
+   */
+  public syncThemeUI(): void {
+    const theme = this.engine.getTheme();
+    if (this.themeToggleBtn) {
+      this.themeToggleBtn.setAttribute(
+        'aria-label',
+        `Switch visual theme, current theme: ${theme}`
+      );
+      this.themeToggleBtn.setAttribute('data-theme', theme);
+    }
+    if (this.themeIconEl) {
+      if (theme === 'dark') {
+        this.themeIconEl.textContent = '🌙';
+      } else if (theme === 'light') {
+        this.themeIconEl.textContent = '☀️';
+      } else {
+        this.themeIconEl.textContent = '👁️';
+      }
     }
   }
 
