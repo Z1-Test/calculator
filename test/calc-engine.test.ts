@@ -93,6 +93,8 @@ describe('StayCalc Precision Arithmetic Engine (F1)', () => {
         waitingForOperand: false,
         error: null,
         isLocked: false,
+        memory: 0,
+        hasActiveMemory: false,
       });
     });
   });
