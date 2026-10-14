@@ -96,6 +96,8 @@ describe('StayCalc Precision Arithmetic Engine (F1)', () => {
         memory: 0,
         hasActiveMemory: false,
         history: [],
+        mode: 'standard',
+        angleUnit: 'DEG',
       });
     });
   });
