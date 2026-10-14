@@ -15,11 +15,27 @@ import type {
   CalculatorAction,
   CalculatorState,
   CalculationResult,
+  CalculationHistoryEntry,
   Operator,
 } from './types.ts';
 
 export const MAX_DISPLAY_DIGITS = 10;
 export const DIVISION_BY_ZERO_ERROR = 'Cannot divide by zero';
+
+let historyCounter = 0;
+export function generateHistoryId(): string {
+  historyCounter += 1;
+  return `hist_${Date.now()}_${historyCounter}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Formats a numeric value or numeric string using precision normalization.
+ */
+export function formatNumber(val: number | string | null | undefined): string {
+  if (val === null || val === undefined) return '0';
+  const num = typeof val === 'number' ? val : parseFloat(val);
+  return normalizePrecision(num);
+}
 
 /**
  * Normalizes a numeric value to eliminate IEEE 754 floating-point artifacts
@@ -118,6 +134,7 @@ export function createInitialState(): CalculatorState {
     isLocked: false,
     memory: 0,
     hasActiveMemory: false,
+    history: [],
   };
 }
 
@@ -135,10 +152,20 @@ export function calculatorReducer(
         ...createInitialState(),
         memory: state.memory,
         hasActiveMemory: state.hasActiveMemory,
+        history: state.history,
       };
     }
     if (action.type === 'ALL_CLEAR') {
-      return createInitialState();
+      return {
+        ...createInitialState(),
+        history: state.history,
+      };
+    }
+    if (action.type === 'CLEAR_HISTORY') {
+      return {
+        ...state,
+        history: [],
+      };
     }
     return state;
   }
@@ -272,6 +299,15 @@ export function calculatorReducer(
           };
         }
 
+        const newEntry: CalculationHistoryEntry = {
+          id: generateHistoryId(),
+          expression: `${formatNumber(state.accumulator)} ${state.pendingOperator} ${formatNumber(currentVal)}`,
+          result: formatNumber(res.value),
+          timestamp: Date.now(),
+        };
+
+        const updatedHistory = [newEntry, ...state.history].slice(0, 100);
+
         return {
           ...state,
           display: res.formatted!,
@@ -280,6 +316,7 @@ export function calculatorReducer(
           waitingForOperand: true,
           error: null,
           isLocked: false,
+          history: updatedHistory,
         };
       }
 
@@ -301,7 +338,11 @@ export function calculatorReducer(
 
     case 'ALL_CLEAR': {
       // All Clear (AC) completely resets accumulator, pending operator, and buffer (RULE-CALC-009)
-      return createInitialState();
+      // History is preserved until explicitly cleared (RULE-CALC-008)
+      return {
+        ...createInitialState(),
+        history: state.history,
+      };
     }
 
     case 'BACKSPACE': {
@@ -391,6 +432,41 @@ export function calculatorReducer(
       };
     }
 
+    case 'CLEAR_HISTORY': {
+      return {
+        ...state,
+        history: [],
+      };
+    }
+
+    case 'LOAD_HISTORY_ENTRY': {
+      const target = action.entry ?? action.entryId;
+      let resultVal: string | undefined;
+
+      if (typeof target === 'object' && target !== null && 'result' in target) {
+        resultVal = target.result;
+      } else if (typeof target === 'string') {
+        const found = state.history.find((e) => e.id === target);
+        if (found) {
+          resultVal = found.result;
+        } else {
+          resultVal = target;
+        }
+      }
+
+      if (resultVal !== undefined) {
+        return {
+          ...state,
+          display: resultVal,
+          waitingForOperand: true,
+          error: null,
+          isLocked: false,
+        };
+      }
+
+      return state;
+    }
+
     default:
       return state;
   }
@@ -464,6 +540,21 @@ export class CalculatorEngine {
 
   public pressMemoryClear(): CalculatorState {
     return this.dispatch({ type: 'MEMORY_CLEAR' });
+  }
+
+  public getHistory(): readonly CalculationHistoryEntry[] {
+    return this.state.history;
+  }
+
+  public clearHistory(): CalculatorState {
+    return this.dispatch({ type: 'CLEAR_HISTORY' });
+  }
+
+  public loadHistoryEntry(entryOrId: CalculationHistoryEntry | string): CalculatorState {
+    if (typeof entryOrId === 'string') {
+      return this.dispatch({ type: 'LOAD_HISTORY_ENTRY', entryId: entryOrId, entry: entryOrId });
+    }
+    return this.dispatch({ type: 'LOAD_HISTORY_ENTRY', entry: entryOrId });
   }
 
   /**
