@@ -116,6 +116,8 @@ export function createInitialState(): CalculatorState {
     waitingForOperand: false,
     error: null,
     isLocked: false,
+    memory: 0,
+    hasActiveMemory: false,
   };
 }
 
@@ -128,7 +130,14 @@ export function calculatorReducer(
 ): CalculatorState {
   // If engine is locked due to error, only CLEAR or ALL_CLEAR can unlock it (RULE-CALC-001)
   if (state.isLocked) {
-    if (action.type === 'CLEAR' || action.type === 'ALL_CLEAR') {
+    if (action.type === 'CLEAR') {
+      return {
+        ...createInitialState(),
+        memory: state.memory,
+        hasActiveMemory: state.hasActiveMemory,
+      };
+    }
+    if (action.type === 'ALL_CLEAR') {
       return createInitialState();
     }
     return state;
@@ -217,6 +226,7 @@ export function calculatorReducer(
         const res = evaluateBinary(state.accumulator, state.pendingOperator, currentVal);
         if (!res.success) {
           return {
+            ...state,
             display: res.error || DIVISION_BY_ZERO_ERROR,
             accumulator: null,
             pendingOperator: null,
@@ -227,6 +237,7 @@ export function calculatorReducer(
         }
 
         return {
+          ...state,
           display: res.formatted!,
           accumulator: res.value!,
           pendingOperator: op,
@@ -251,6 +262,7 @@ export function calculatorReducer(
         const res = evaluateBinary(state.accumulator, state.pendingOperator, currentVal);
         if (!res.success) {
           return {
+            ...state,
             display: res.error || DIVISION_BY_ZERO_ERROR,
             accumulator: null,
             pendingOperator: null,
@@ -261,6 +273,7 @@ export function calculatorReducer(
         }
 
         return {
+          ...state,
           display: res.formatted!,
           accumulator: res.value!,
           pendingOperator: null,
@@ -329,6 +342,55 @@ export function calculatorReducer(
       };
     }
 
+    case 'MEMORY_ADD': {
+      const currentVal = parseFloat(state.display);
+      if (isNaN(currentVal)) {
+        return state;
+      }
+      const normalizedStr = normalizePrecision(state.memory + currentVal);
+      const newMemory = parseFloat(normalizedStr);
+      const cleanMemory = Object.is(newMemory, -0) || newMemory === 0 ? 0 : newMemory;
+      return {
+        ...state,
+        memory: cleanMemory,
+        hasActiveMemory: cleanMemory !== 0,
+        waitingForOperand: true,
+      };
+    }
+
+    case 'MEMORY_SUBTRACT': {
+      const currentVal = parseFloat(state.display);
+      if (isNaN(currentVal)) {
+        return state;
+      }
+      const normalizedStr = normalizePrecision(state.memory - currentVal);
+      const newMemory = parseFloat(normalizedStr);
+      const cleanMemory = Object.is(newMemory, -0) || newMemory === 0 ? 0 : newMemory;
+      return {
+        ...state,
+        memory: cleanMemory,
+        hasActiveMemory: cleanMemory !== 0,
+        waitingForOperand: true,
+      };
+    }
+
+    case 'MEMORY_RECALL': {
+      const formatted = normalizePrecision(state.memory);
+      return {
+        ...state,
+        display: formatted,
+        waitingForOperand: true,
+      };
+    }
+
+    case 'MEMORY_CLEAR': {
+      return {
+        ...state,
+        memory: 0,
+        hasActiveMemory: false,
+      };
+    }
+
     default:
       return state;
   }
@@ -386,6 +448,22 @@ export class CalculatorEngine {
 
   public pressToggleSign(): CalculatorState {
     return this.dispatch({ type: 'NEGATE' });
+  }
+
+  public pressMemoryAdd(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_ADD' });
+  }
+
+  public pressMemorySubtract(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_SUBTRACT' });
+  }
+
+  public pressMemoryRecall(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_RECALL' });
+  }
+
+  public pressMemoryClear(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_CLEAR' });
   }
 
   /**

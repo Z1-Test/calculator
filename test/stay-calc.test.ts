@@ -493,9 +493,9 @@ describe('StayCalc Autonomous Custom Element (F2)', () => {
       assert.strictEqual(displayScreen.getAttribute('aria-atomic'), 'true');
     });
 
-    it('renders 20 keypad buttons with accessible aria-label attributes', () => {
+    it('renders 24 keypad buttons with accessible aria-label attributes', () => {
       const buttons = calc.shadowRoot?.querySelectorAll('button') ?? [];
-      assert.strictEqual(buttons.length, 20);
+      assert.strictEqual(buttons.length, 24);
 
       for (const btn of buttons) {
         assert.ok(btn.getAttribute('aria-label'), `Button ${btn.textContent} missing aria-label`);

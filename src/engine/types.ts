@@ -14,7 +14,11 @@ export type ActionType =
   | 'CLEAR'
   | 'ALL_CLEAR'
   | 'BACKSPACE'
-  | 'NEGATE';
+  | 'NEGATE'
+  | 'MEMORY_ADD'
+  | 'MEMORY_SUBTRACT'
+  | 'MEMORY_RECALL'
+  | 'MEMORY_CLEAR';
 
 export interface CalculatorAction {
   readonly type: ActionType;
@@ -29,6 +33,8 @@ export interface CalculatorState {
   readonly waitingForOperand: boolean;
   readonly error: string | null;
   readonly isLocked: boolean;
+  readonly memory: number;
+  readonly hasActiveMemory: boolean;
 }
 
 export interface CalculationResult {
