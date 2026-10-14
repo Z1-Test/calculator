@@ -23,6 +23,7 @@ export type Operator =
 export type AngleUnit = 'DEG' | 'RAD';
 export type CalculatorMode = 'standard' | 'scientific' | 'programmer';
 export type Radix = 'HEX' | 'DEC' | 'OCT' | 'BIN';
+export type CalculatorTheme = 'dark' | 'light' | 'high-contrast';
 
 export interface MultiRadixValues {
   readonly hex: string;
@@ -76,7 +77,9 @@ export type ActionType =
   | 'CYCLE_MODE'
   | 'SET_RADIX'
   | 'BITWISE_NOT'
-  | 'INPUT_HEX_DIGIT';
+  | 'INPUT_HEX_DIGIT'
+  | 'SET_THEME'
+  | 'CYCLE_THEME';
 
 export interface CalculatorAction {
   readonly type: ActionType;
@@ -88,6 +91,7 @@ export interface CalculatorAction {
   readonly constant?: 'pi' | 'e';
   readonly mode?: CalculatorMode;
   readonly radix?: Radix;
+  readonly theme?: CalculatorTheme;
 }
 
 export interface CalculatorState {
@@ -104,6 +108,7 @@ export interface CalculatorState {
   readonly angleUnit: AngleUnit;
   readonly radix: Radix;
   readonly multiRadix: MultiRadixValues;
+  readonly theme: CalculatorTheme;
 }
 
 export interface CalculationResult {

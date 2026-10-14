@@ -105,6 +105,7 @@ describe('StayCalc Precision Arithmetic Engine (F1)', () => {
           oct: '0',
           bin: '0',
         },
+        theme: 'dark',
       });
     });
   });
