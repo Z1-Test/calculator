@@ -103,6 +103,55 @@ export function formatNumber(val: number | string | null | undefined): string {
 }
 
 /**
+ * Formats an operand for inclusion in formula expression preview based on active mode and radix.
+ */
+export function formatOperandForExpression(
+  val: number | string | null | undefined,
+  mode: CalculatorMode,
+  radix: Radix
+): string {
+  if (val === null || val === undefined) return '0';
+  if (mode === 'programmer') {
+    const intVal =
+      typeof val === 'number'
+        ? (val | 0)
+        : parseDisplayToInteger(String(val), radix);
+    return formatRadixValue(intVal, radix);
+  }
+  return typeof val === 'number' ? formatNumber(val) : formatNumber(val);
+}
+
+/**
+ * Wraps an operand in unary function syntax for formula expression preview.
+ */
+export function wrapUnaryExpression(
+  currentExpr: string,
+  displayVal: string,
+  funcName: string,
+  hasPendingOp: boolean
+): string {
+  if (currentExpr.endsWith('=')) {
+    return `${funcName}(${displayVal})`;
+  }
+  if (hasPendingOp && currentExpr.endsWith(' ')) {
+    return `${currentExpr}${funcName}(${displayVal})`;
+  }
+  if (hasPendingOp) {
+    const trimmed = currentExpr.trimEnd();
+    const lastSpaceIdx = trimmed.lastIndexOf(' ');
+    if (lastSpaceIdx !== -1) {
+      const prefix = trimmed.slice(0, lastSpaceIdx + 1);
+      const lastToken = trimmed.slice(lastSpaceIdx + 1);
+      return `${prefix}${funcName}(${lastToken})`;
+    }
+  }
+  if (currentExpr && currentExpr !== '0') {
+    return `${funcName}(${currentExpr})`;
+  }
+  return `${funcName}(${displayVal})`;
+}
+
+/**
  * Normalizes a numeric value to eliminate IEEE 754 floating-point artifacts
  * while adhering to the maximum 10-digit display boundary.
  */
@@ -416,6 +465,7 @@ export function evaluateTrig(
 export function createInitialState(): CalculatorState {
   return {
     display: '0',
+    expression: '',
     accumulator: null,
     pendingOperator: null,
     waitingForOperand: false,
@@ -472,6 +522,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: rawValue,
+        expression: state.pendingOperator !== null ? state.expression : '',
         multiRadix: computeMultiRadix(Number.isFinite(parsedVal) ? parsedVal : 0),
         waitingForOperand: true,
         error: null,
@@ -517,6 +568,8 @@ export function calculatorReducer(
       const rawDigit = (action.digit ?? action.hexDigit ?? '').toUpperCase();
       if (!rawDigit) return state;
 
+      const startsFresh = state.expression.endsWith('=');
+
       // In programmer mode, enforce dynamic radix gating on digits
       if (state.mode === 'programmer') {
         let isAllowed = false;
@@ -539,11 +592,14 @@ export function calculatorReducer(
           return state;
         }
 
-        if (state.waitingForOperand || state.display === '0') {
+        if (startsFresh || state.waitingForOperand || state.display === '0') {
           const intVal = parseDisplayToInteger(rawDigit, state.radix);
           return {
             ...state,
             display: rawDigit,
+            expression: startsFresh ? '' : state.expression,
+            accumulator: startsFresh ? null : state.accumulator,
+            pendingOperator: startsFresh ? null : state.pendingOperator,
             multiRadix: computeMultiRadix(intVal),
             waitingForOperand: false,
           };
@@ -573,6 +629,19 @@ export function calculatorReducer(
       // Standard and scientific modes: only digits 0-9 allowed
       if (!/^[0-9]$/.test(rawDigit)) {
         return state;
+      }
+
+      if (startsFresh) {
+        const numVal = parseFloat(rawDigit);
+        return {
+          ...state,
+          display: rawDigit,
+          expression: '',
+          accumulator: null,
+          pendingOperator: null,
+          multiRadix: computeMultiRadix(numVal),
+          waitingForOperand: false,
+        };
       }
 
       if (state.waitingForOperand) {
@@ -625,6 +694,18 @@ export function calculatorReducer(
         return state;
       }
 
+      const startsFresh = state.expression.endsWith('=');
+      if (startsFresh) {
+        return {
+          ...state,
+          display: '0.',
+          expression: '',
+          accumulator: null,
+          pendingOperator: null,
+          waitingForOperand: false,
+        };
+      }
+
       if (state.waitingForOperand) {
         return {
           ...state,
@@ -651,10 +732,16 @@ export function calculatorReducer(
 
       // Format current active integer value in target radix
       const nextDisplay = state.multiRadix[nextRadix.toLowerCase() as keyof MultiRadixValues];
+      let nextExpr = state.expression;
+      if (state.pendingOperator !== null && state.accumulator !== null) {
+        const formattedAcc = formatRadixValue(state.accumulator, nextRadix);
+        nextExpr = `${formattedAcc} ${state.pendingOperator} `;
+      }
       return {
         ...state,
         radix: nextRadix,
         display: nextDisplay,
+        expression: nextExpr,
       };
     }
 
@@ -669,10 +756,21 @@ export function calculatorReducer(
           ? formatRadixValue(res, state.radix)
           : normalizePrecision(res);
       const multiRadix = computeMultiRadix(res);
+      const operandStr =
+        state.mode === 'programmer'
+          ? formatRadixValue(currentVal | 0, state.radix)
+          : state.display;
+      const nextExpr = wrapUnaryExpression(
+        state.expression,
+        operandStr,
+        '~',
+        state.pendingOperator !== null
+      );
 
       return {
         ...state,
         display: formatted,
+        expression: nextExpr,
         accumulator: res,
         multiRadix,
         waitingForOperand: true,
@@ -706,9 +804,14 @@ export function calculatorReducer(
       // Operator replacement invariant (RULE-CALC-008):
       // If waiting for operand and an operator is already pending, replace it
       if (state.waitingForOperand && state.pendingOperator !== null) {
+        const trimmed = state.expression.trimEnd();
+        const lastSpaceIdx = trimmed.lastIndexOf(' ');
+        const base = lastSpaceIdx !== -1 ? trimmed.slice(0, lastSpaceIdx + 1) : '';
+        const nextExpr = `${base}${op} `;
         return {
           ...state,
           pendingOperator: op,
+          expression: nextExpr,
         };
       }
 
@@ -728,9 +831,14 @@ export function calculatorReducer(
           state.radix
         );
         if (!res.success) {
+          const exprB = formatOperandForExpression(currentVal, state.mode, state.radix);
+          const errExpr = state.expression.endsWith(' ')
+            ? `${state.expression}${exprB} =`
+            : `${state.expression} =`;
           return {
             ...state,
             display: res.error || DIVISION_BY_ZERO_ERROR,
+            expression: errExpr,
             accumulator: null,
             pendingOperator: null,
             waitingForOperand: true,
@@ -740,9 +848,16 @@ export function calculatorReducer(
         }
 
         const nextMulti = computeMultiRadix(res.value!);
+        const formattedRes =
+          state.mode === 'programmer'
+            ? formatRadixValue(res.value!, state.radix)
+            : res.formatted!;
+        const nextExpr = `${formattedRes} ${op} `;
+
         return {
           ...state,
           display: res.formatted!,
+          expression: nextExpr,
           accumulator: res.value!,
           pendingOperator: op,
           waitingForOperand: true,
@@ -753,10 +868,13 @@ export function calculatorReducer(
       }
 
       // Otherwise register first operand
+      const formattedAcc = formatOperandForExpression(currentVal, state.mode, state.radix);
+      const nextExpr = `${formattedAcc} ${op} `;
       return {
         ...state,
         accumulator: currentVal,
         pendingOperator: op,
+        expression: nextExpr,
         waitingForOperand: true,
       };
     }
@@ -767,6 +885,17 @@ export function calculatorReducer(
           state.mode === 'programmer'
             ? parseDisplayToInteger(state.display, state.radix)
             : parseFloat(state.display);
+        const exprB = formatOperandForExpression(currentVal, state.mode, state.radix);
+
+        let finalExpr: string;
+        if (state.expression.endsWith(' ')) {
+          finalExpr = `${state.expression}${exprB} =`;
+        } else if (!state.expression.endsWith('=')) {
+          finalExpr = `${state.expression} =`;
+        } else {
+          finalExpr = state.expression;
+        }
+
         const res = evaluateBinary(
           state.accumulator,
           state.pendingOperator,
@@ -778,6 +907,7 @@ export function calculatorReducer(
           return {
             ...state,
             display: res.error || DIVISION_BY_ZERO_ERROR,
+            expression: finalExpr,
             accumulator: null,
             pendingOperator: null,
             waitingForOperand: true,
@@ -791,10 +921,6 @@ export function calculatorReducer(
           state.mode === 'programmer'
             ? formatRadixValue(state.accumulator, state.radix)
             : formatNumber(state.accumulator);
-        const exprB =
-          state.mode === 'programmer'
-            ? formatRadixValue(currentVal, state.radix)
-            : formatNumber(currentVal);
 
         const newEntry: CalculationHistoryEntry = {
           id: generateHistoryId(),
@@ -809,6 +935,7 @@ export function calculatorReducer(
         return {
           ...state,
           display: res.formatted!,
+          expression: finalExpr,
           accumulator: res.value!,
           pendingOperator: null,
           waitingForOperand: true,
@@ -820,17 +947,45 @@ export function calculatorReducer(
       }
 
       // Idempotent repeated equals or equals without pending operator
+      let finalExpr = state.expression;
+      if (finalExpr.endsWith('=')) {
+        // already ends with =, keep it
+      } else if (finalExpr) {
+        finalExpr = `${finalExpr} =`;
+      } else {
+        const currentVal =
+          state.mode === 'programmer'
+            ? parseDisplayToInteger(state.display, state.radix)
+            : parseFloat(state.display);
+        finalExpr = `${formatOperandForExpression(currentVal, state.mode, state.radix)} =`;
+      }
+
       return {
         ...state,
+        expression: finalExpr,
         waitingForOperand: true,
       };
     }
 
     case 'CLEAR': {
       // Clear (C) resets active input buffer to "0" without flushing accumulator (RULE-CALC-009)
+      let nextExpr = state.expression;
+      if (state.expression.endsWith('=')) {
+        nextExpr = '';
+      } else if (state.pendingOperator !== null && state.accumulator !== null) {
+        const opStr = ` ${state.pendingOperator} `;
+        const idx = state.expression.indexOf(opStr);
+        if (idx !== -1) {
+          nextExpr = state.expression.slice(0, idx + opStr.length);
+        }
+      } else {
+        nextExpr = '';
+      }
+
       return {
         ...state,
         display: '0',
+        expression: nextExpr,
         waitingForOperand: false,
         multiRadix: computeMultiRadix(0),
       };
@@ -851,6 +1006,13 @@ export function calculatorReducer(
     }
 
     case 'BACKSPACE': {
+      if (state.expression.endsWith('=')) {
+        return {
+          ...state,
+          expression: '',
+        };
+      }
+
       if (state.waitingForOperand) {
         return state;
       }
@@ -877,6 +1039,7 @@ export function calculatorReducer(
     }
 
     case 'NEGATE': {
+      const startsFresh = state.expression.endsWith('=');
       if (state.mode === 'programmer') {
         const currentInt = parseDisplayToInteger(state.display, state.radix);
         const negVal = (-currentInt) | 0;
@@ -884,6 +1047,7 @@ export function calculatorReducer(
         return {
           ...state,
           display: formatted,
+          expression: startsFresh ? '' : state.expression,
           multiRadix: computeMultiRadix(negVal),
         };
       }
@@ -904,6 +1068,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: nextDisp,
+        expression: startsFresh ? '' : state.expression,
         multiRadix: computeMultiRadix(nextVal),
       };
     }
@@ -997,6 +1162,7 @@ export function calculatorReducer(
         return {
           ...state,
           display: resultVal,
+          expression: '',
           multiRadix: computeMultiRadix(val),
           waitingForOperand: true,
           error: null,
@@ -1009,10 +1175,17 @@ export function calculatorReducer(
 
     case 'SQUARE_ROOT': {
       const currentVal = parseFloat(state.display);
+      const nextExpr = wrapUnaryExpression(
+        state.expression,
+        state.display,
+        '√',
+        state.pendingOperator !== null
+      );
       if (Number.isNaN(currentVal) || currentVal < 0) {
         return {
           ...state,
           display: INVALID_INPUT_ERROR,
+          expression: nextExpr,
           accumulator: null,
           pendingOperator: null,
           waitingForOperand: true,
@@ -1025,6 +1198,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: formatted,
+        expression: nextExpr,
         multiRadix: computeMultiRadix(res),
         waitingForOperand: true,
         error: null,
@@ -1037,11 +1211,18 @@ export function calculatorReducer(
       if (Number.isNaN(currentVal)) {
         return state;
       }
+      const nextExpr = wrapUnaryExpression(
+        state.expression,
+        state.display,
+        'sqr',
+        state.pendingOperator !== null
+      );
       const res = currentVal * currentVal;
       if (!Number.isFinite(res) || Number.isNaN(res)) {
         return {
           ...state,
           display: INVALID_INPUT_ERROR,
+          expression: nextExpr,
           accumulator: null,
           pendingOperator: null,
           waitingForOperand: true,
@@ -1053,6 +1234,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: formatted,
+        expression: nextExpr,
         multiRadix: computeMultiRadix(res),
         waitingForOperand: true,
         error: null,
@@ -1066,10 +1248,17 @@ export function calculatorReducer(
       const func = action.type.toLowerCase() as 'sin' | 'cos' | 'tan';
       const currentVal = parseFloat(state.display);
       const res = evaluateTrig(func, currentVal, state.angleUnit);
+      const nextExpr = wrapUnaryExpression(
+        state.expression,
+        state.display,
+        func,
+        state.pendingOperator !== null
+      );
       if (!res.success) {
         return {
           ...state,
           display: res.error || INVALID_INPUT_ERROR,
+          expression: nextExpr,
           accumulator: null,
           pendingOperator: null,
           waitingForOperand: true,
@@ -1080,6 +1269,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: res.formatted!,
+        expression: nextExpr,
         multiRadix: computeMultiRadix(res.value!),
         waitingForOperand: true,
         error: null,
@@ -1098,9 +1288,11 @@ export function calculatorReducer(
         return state;
       }
       const formatted = normalizePrecision(val);
+      const startsFresh = state.expression.endsWith('=');
       return {
         ...state,
         display: formatted,
+        expression: startsFresh ? '' : state.expression,
         multiRadix: computeMultiRadix(val),
         waitingForOperand: true,
         error: null,
@@ -1244,6 +1436,7 @@ export function calculatorReducer(
       return {
         ...state,
         display: rawValue,
+        expression: state.pendingOperator !== null ? state.expression : '',
         multiRadix: computeMultiRadix(Number.isFinite(parsedVal) ? parsedVal : 0),
         waitingForOperand: true,
         error: null,
@@ -1271,6 +1464,10 @@ export class CalculatorEngine {
 
   public getState(): CalculatorState {
     return this.state;
+  }
+
+  public getExpression(): string {
+    return this.state.expression;
   }
 
   public dispatch(action: CalculatorAction): CalculatorState {

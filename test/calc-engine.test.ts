@@ -88,6 +88,7 @@ describe('StayCalc Precision Arithmetic Engine (F1)', () => {
       const state = createInitialState();
       assert.deepStrictEqual(state, {
         display: '0',
+        expression: '',
         accumulator: null,
         pendingOperator: null,
         waitingForOperand: false,

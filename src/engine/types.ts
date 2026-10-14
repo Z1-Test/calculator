@@ -103,6 +103,7 @@ export interface CalculatorAction {
 
 export interface CalculatorState {
   readonly display: string;
+  readonly expression: string;
   readonly accumulator: number | null;
   readonly pendingOperator: Operator | null;
   readonly waitingForOperand: boolean;
