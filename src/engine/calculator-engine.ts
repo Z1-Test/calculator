@@ -26,6 +26,7 @@ import type {
   AngleUnit,
   Radix,
   MultiRadixValues,
+  CalculatorTheme,
 } from './types.ts';
 
 export const MAX_DISPLAY_DIGITS = 10;
@@ -432,6 +433,7 @@ export function createInitialState(): CalculatorState {
       oct: '0',
       bin: '0',
     },
+    theme: 'dark',
   };
 }
 
@@ -443,10 +445,28 @@ export function calculatorReducer(
   action: CalculatorAction
 ): CalculatorState {
   // If engine is locked due to error, only CLEAR or ALL_CLEAR can unlock it (RULE-CALC-001)
+  // Theme changes are preserved without unlocking or altering error state (NEVER-CALC-002)
   if (state.isLocked) {
+    if (action.type === 'SET_THEME') {
+      return {
+        ...state,
+        theme: action.theme ?? 'dark',
+      };
+    }
+    if (action.type === 'CYCLE_THEME') {
+      let nextTheme: CalculatorTheme;
+      if (state.theme === 'dark') nextTheme = 'light';
+      else if (state.theme === 'light') nextTheme = 'high-contrast';
+      else nextTheme = 'dark';
+      return {
+        ...state,
+        theme: nextTheme,
+      };
+    }
     if (action.type === 'CLEAR') {
       return {
         ...createInitialState(),
+        theme: state.theme,
         memory: state.memory,
         hasActiveMemory: state.hasActiveMemory,
         history: state.history,
@@ -459,6 +479,7 @@ export function calculatorReducer(
     if (action.type === 'ALL_CLEAR') {
       return {
         ...createInitialState(),
+        theme: state.theme,
         history: state.history,
         mode: state.mode,
         angleUnit: state.angleUnit,
@@ -802,9 +823,10 @@ export function calculatorReducer(
 
     case 'ALL_CLEAR': {
       // All Clear (AC) completely resets accumulator, pending operator, and buffer (RULE-CALC-009)
-      // History, mode, radix, and angle unit are preserved (RULE-CALC-006, RULE-CALC-008)
+      // History, mode, radix, angle unit, and theme are preserved (RULE-CALC-006, RULE-CALC-008, NEVER-CALC-002)
       return {
         ...createInitialState(),
+        theme: state.theme,
         history: state.history,
         mode: state.mode,
         angleUnit: state.angleUnit,
@@ -1175,6 +1197,29 @@ export function calculatorReducer(
       };
     }
 
+    case 'SET_THEME': {
+      const nextTheme = action.theme ?? 'dark';
+      return {
+        ...state,
+        theme: nextTheme,
+      };
+    }
+
+    case 'CYCLE_THEME': {
+      let nextTheme: CalculatorTheme;
+      if (state.theme === 'dark') {
+        nextTheme = 'light';
+      } else if (state.theme === 'light') {
+        nextTheme = 'high-contrast';
+      } else {
+        nextTheme = 'dark';
+      }
+      return {
+        ...state,
+        theme: nextTheme,
+      };
+    }
+
     default:
       return state;
   }
@@ -1327,6 +1372,18 @@ export class CalculatorEngine {
 
   public getMultiRadix(): MultiRadixValues {
     return this.state.multiRadix;
+  }
+
+  public getTheme(): CalculatorTheme {
+    return this.state.theme;
+  }
+
+  public setTheme(theme: CalculatorTheme): CalculatorState {
+    return this.dispatch({ type: 'SET_THEME', theme });
+  }
+
+  public cycleTheme(): CalculatorState {
+    return this.dispatch({ type: 'CYCLE_THEME' });
   }
 
   public bitwiseNot(): CalculatorState {
