@@ -98,6 +98,13 @@ describe('StayCalc Precision Arithmetic Engine (F1)', () => {
         history: [],
         mode: 'standard',
         angleUnit: 'DEG',
+        radix: 'HEX',
+        multiRadix: {
+          hex: '0',
+          dec: '0',
+          oct: '0',
+          bin: '0',
+        },
       });
     });
   });
