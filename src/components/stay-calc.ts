@@ -79,10 +79,26 @@ const TEMPLATE_STYLES = `
     border-radius: 12px;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
-    align-items: flex-end;
+    justify-content: space-between;
+    align-items: stretch;
     overflow: hidden;
     transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .memory-indicator {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--calc-primary, #2563eb);
+    line-height: 1;
+    align-self: flex-start;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+  }
+
+  .memory-indicator.active {
+    visibility: visible;
+    opacity: 1;
   }
 
   .display-screen.error {
@@ -100,6 +116,7 @@ const TEMPLATE_STYLES = `
     text-align: end;
     word-break: break-all;
     max-inline-size: 100%;
+    margin-inline-start: auto;
   }
 
   .display-screen.error .display-value {
@@ -154,6 +171,17 @@ const TEMPLATE_STYLES = `
     outline-offset: 2px;
   }
 
+  .calc-btn.btn-memory {
+    background-color: var(--calc-container-medium, #f4f4f5);
+    color: var(--calc-text-primary, #09090b);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .calc-btn.btn-memory:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+  }
+
   .calc-btn.btn-op {
     background-color: var(--calc-tertiary, #f4f4f5);
     color: var(--calc-secondary, #475569);
@@ -201,6 +229,7 @@ const TEMPLATE_HTML = `
     <div class="display-slot-wrapper">
       <slot name="display">
         <div class="display-screen" id="defaultDisplay" role="status" aria-live="polite" aria-atomic="true">
+          <span class="memory-indicator" id="memoryIndicator" aria-hidden="true">M</span>
           <span class="display-value" id="displayValue">0</span>
         </div>
       </slot>
@@ -208,6 +237,11 @@ const TEMPLATE_HTML = `
     <div class="keypad-slot-wrapper">
       <slot name="keypad">
         <div class="keypad-grid" id="defaultKeypad" role="group" aria-label="Calculator Keypad">
+          <button type="button" class="calc-btn btn-memory" data-action="memory-clear" aria-label="Memory Clear">MC</button>
+          <button type="button" class="calc-btn btn-memory" data-action="memory-recall" aria-label="Memory Recall">MR</button>
+          <button type="button" class="calc-btn btn-memory" data-action="memory-subtract" aria-label="Memory Subtract">M−</button>
+          <button type="button" class="calc-btn btn-memory" data-action="memory-add" aria-label="Memory Add">M+</button>
+
           <button type="button" class="calc-btn btn-action" data-action="all-clear" aria-label="All Clear">AC</button>
           <button type="button" class="calc-btn btn-action" data-action="clear" aria-label="Clear">C</button>
           <button type="button" class="calc-btn btn-action" data-action="negate" aria-label="Toggle Sign">+/-</button>
@@ -248,6 +282,7 @@ export class StayCalc extends BaseClass {
   private engine: CalculatorEngine;
   private defaultDisplayEl: HTMLElement | null = null;
   private displayValueEl: HTMLElement | null = null;
+  private memoryIndicatorEl: HTMLElement | null = null;
   private keypadEl: HTMLElement | null = null;
   private isConnectedToDOM = false;
 
@@ -271,6 +306,7 @@ export class StayCalc extends BaseClass {
 
     this.defaultDisplayEl = shadow.querySelector('#defaultDisplay');
     this.displayValueEl = shadow.querySelector('#displayValue');
+    this.memoryIndicatorEl = shadow.querySelector('#memoryIndicator');
     this.keypadEl = shadow.querySelector('#defaultKeypad');
   }
 
@@ -330,6 +366,22 @@ export class StayCalc extends BaseClass {
     return newState;
   }
 
+  public pressMemoryAdd(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_ADD' });
+  }
+
+  public pressMemorySubtract(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_SUBTRACT' });
+  }
+
+  public pressMemoryRecall(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_RECALL' });
+  }
+
+  public pressMemoryClear(): CalculatorState {
+    return this.dispatch({ type: 'MEMORY_CLEAR' });
+  }
+
   /**
    * Handles button click actions triggered from keypad.
    */
@@ -351,6 +403,18 @@ export class StayCalc extends BaseClass {
         return this.dispatch({ type: 'BACKSPACE' });
       case 'negate':
         return this.dispatch({ type: 'NEGATE' });
+      case 'memory-add':
+      case 'm-plus':
+        return this.dispatch({ type: 'MEMORY_ADD' });
+      case 'memory-subtract':
+      case 'm-minus':
+        return this.dispatch({ type: 'MEMORY_SUBTRACT' });
+      case 'memory-recall':
+      case 'mr':
+        return this.dispatch({ type: 'MEMORY_RECALL' });
+      case 'memory-clear':
+      case 'mc':
+        return this.dispatch({ type: 'MEMORY_CLEAR' });
       default:
         return this.getState();
     }
@@ -428,6 +492,17 @@ export class StayCalc extends BaseClass {
       this.displayValueEl.textContent = state.display;
     }
 
+    if (this.memoryIndicatorEl) {
+      if (state.hasActiveMemory) {
+        this.memoryIndicatorEl.classList.add('active');
+      } else {
+        this.memoryIndicatorEl.classList.remove('active');
+      }
+      if (this.memoryIndicatorEl.style) {
+        this.memoryIndicatorEl.style.visibility = state.hasActiveMemory ? 'visible' : 'hidden';
+      }
+    }
+
     if (this.defaultDisplayEl) {
       if (state.isLocked) {
         this.defaultDisplayEl.classList.add('error');
@@ -444,6 +519,18 @@ export class StayCalc extends BaseClass {
         slottedDisplay.classList.add('error');
       } else {
         slottedDisplay.classList.remove('error');
+      }
+    }
+
+    const slottedMemory = this.querySelector('[slot="memory"]');
+    if (slottedMemory) {
+      if (state.hasActiveMemory) {
+        slottedMemory.classList.add('active');
+      } else {
+        slottedMemory.classList.remove('active');
+      }
+      if ((slottedMemory as HTMLElement).style) {
+        (slottedMemory as HTMLElement).style.visibility = state.hasActiveMemory ? 'visible' : 'hidden';
       }
     }
 
