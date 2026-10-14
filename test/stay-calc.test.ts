@@ -130,6 +130,12 @@ class MockElement {
     return this.attributes.has(name);
   }
 
+  public removeAttribute(name: string): void {
+    this.attributes.delete(name);
+    if (name === 'id') this.id = '';
+    if (name === 'class') this.classes.clear();
+  }
+
   public appendChild(child: MockElement): MockElement {
     child.parentNode = this;
     this.children.push(child);
@@ -494,7 +500,9 @@ describe('StayCalc Autonomous Custom Element (F2)', () => {
     });
 
     it('renders 24 keypad buttons with accessible aria-label attributes', () => {
-      const buttons = calc.shadowRoot?.querySelectorAll('button') ?? [];
+      const buttons = (calc.shadowRoot?.querySelectorAll('button') ?? []).filter(
+        (b: MockElement) => b.classList.contains('calc-btn')
+      );
       assert.strictEqual(buttons.length, 24);
 
       for (const btn of buttons) {

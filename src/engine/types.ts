@@ -6,6 +6,13 @@
 
 export type Operator = '+' | '-' | '*' | '/';
 
+export interface CalculationHistoryEntry {
+  readonly id: string;
+  readonly expression: string;
+  readonly result: string;
+  readonly timestamp: number;
+}
+
 export type ActionType =
   | 'DIGIT'
   | 'DECIMAL'
@@ -18,12 +25,16 @@ export type ActionType =
   | 'MEMORY_ADD'
   | 'MEMORY_SUBTRACT'
   | 'MEMORY_RECALL'
-  | 'MEMORY_CLEAR';
+  | 'MEMORY_CLEAR'
+  | 'CLEAR_HISTORY'
+  | 'LOAD_HISTORY_ENTRY';
 
 export interface CalculatorAction {
   readonly type: ActionType;
   readonly digit?: string;
   readonly operator?: Operator;
+  readonly entry?: CalculationHistoryEntry | string;
+  readonly entryId?: string;
 }
 
 export interface CalculatorState {
@@ -35,6 +46,7 @@ export interface CalculatorState {
   readonly isLocked: boolean;
   readonly memory: number;
   readonly hasActiveMemory: boolean;
+  readonly history: readonly CalculationHistoryEntry[];
 }
 
 export interface CalculationResult {

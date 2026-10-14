@@ -20,6 +20,7 @@ import {
 import type {
   CalculatorAction,
   CalculatorState,
+  CalculationHistoryEntry,
   Operator,
 } from '../engine/types.ts';
 
@@ -202,11 +203,173 @@ const TEMPLATE_STYLES = `
     background-color: #1d4ed8;
   }
 
+  .calc-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    inline-size: 100%;
+  }
+
+  .history-toggle-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    background-color: var(--calc-surface, #f4f4f5);
+    color: var(--calc-text-primary, #09090b);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 8px;
+    padding-inline: 10px;
+    padding-block: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    touch-action: manipulation;
+  }
+
+  .history-toggle-btn:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+  }
+
+  .history-toggle-btn:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
+
+  .history-drawer {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    inline-size: 100%;
+    max-block-size: 240px;
+    overflow-y: auto;
+    padding-inline: 14px;
+    padding-block: 12px;
+    background-color: var(--calc-surface, #f4f4f5);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 12px;
+    box-sizing: border-box;
+  }
+
+  .history-drawer.open {
+    display: flex;
+  }
+
+  .history-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    inline-size: 100%;
+    padding-block-end: 6px;
+    border-block-end: 1px solid var(--calc-outline-low, #e4e4e7);
+  }
+
+  .history-drawer-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--calc-text-primary, #09090b);
+  }
+
+  .clear-history-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    background: transparent;
+    color: var(--calc-error, #ff453a);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding-inline: 8px;
+    padding-block: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .clear-history-btn:hover {
+    background-color: rgba(255, 69, 58, 0.1);
+  }
+
+  .clear-history-btn:focus-visible {
+    outline: 2px solid var(--calc-error, #ff453a);
+    outline-offset: 1px;
+  }
+
+  .history-empty {
+    font-size: 13px;
+    color: var(--calc-text-secondary, #71717a);
+    text-align: center;
+    padding-block: 14px;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    inline-size: 100%;
+  }
+
+  .history-entry {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    background-color: var(--calc-container-high, #ffffff);
+    color: var(--calc-text-primary, #09090b);
+    font-family: inherit;
+    border-radius: 8px;
+    padding-inline: 10px;
+    padding-block: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    cursor: pointer;
+    inline-size: 100%;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+    box-sizing: border-box;
+  }
+
+  .history-entry:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+    border-color: var(--calc-primary, #2563eb);
+  }
+
+  .history-entry:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 1px;
+  }
+
+  .history-entry-expr {
+    font-size: 12px;
+    color: var(--calc-text-secondary, #71717a);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .history-entry-result {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--calc-text-primary, #09090b);
+    font-variant-numeric: tabular-nums;
+  }
+
   @container calc-host (max-width: 390px) {
     .calc-container {
       padding-inline: 10px;
       padding-block: 12px;
       gap: 10px;
+    }
+    .history-drawer {
+      max-block-size: 200px;
+      padding-inline: 10px;
+      padding-block: 8px;
+    }
+    .history-entry-result {
+      font-size: 15px;
     }
     .keypad-grid {
       gap: 8px;
@@ -226,6 +389,42 @@ const TEMPLATE_STYLES = `
 const TEMPLATE_HTML = `
   <style>${TEMPLATE_STYLES}</style>
   <div class="calc-container" part="container">
+    <div class="calc-header">
+      <button
+        type="button"
+        class="history-toggle-btn"
+        id="historyToggle"
+        data-action="history-toggle"
+        aria-expanded="false"
+        aria-controls="historyDrawer"
+        aria-label="Toggle calculation history"
+        title="Calculation History"
+      >
+        <span aria-hidden="true">⏱</span> History
+      </button>
+    </div>
+    <div
+      class="history-drawer"
+      id="historyDrawer"
+      role="region"
+      aria-label="Calculation History"
+      aria-hidden="true"
+    >
+      <div class="history-drawer-header">
+        <span class="history-drawer-title">Calculation History</span>
+        <button
+          type="button"
+          class="clear-history-btn"
+          id="clearHistory"
+          data-action="clear-history"
+          aria-label="Clear calculation history"
+        >
+          Clear
+        </button>
+      </div>
+      <div class="history-empty" id="historyEmpty">No calculations yet</div>
+      <div class="history-list" id="historyList" role="list"></div>
+    </div>
     <div class="display-slot-wrapper">
       <slot name="display">
         <div class="display-screen" id="defaultDisplay" role="status" aria-live="polite" aria-atomic="true">
@@ -284,13 +483,23 @@ export class StayCalc extends BaseClass {
   private displayValueEl: HTMLElement | null = null;
   private memoryIndicatorEl: HTMLElement | null = null;
   private keypadEl: HTMLElement | null = null;
+  private historyToggleBtn: HTMLElement | null = null;
+  private historyDrawerEl: HTMLElement | null = null;
+  private clearHistoryBtn: HTMLElement | null = null;
+  private historyEmptyEl: HTMLElement | null = null;
+  private historyListEl: HTMLElement | null = null;
+  private isDrawerOpen = false;
   private isConnectedToDOM = false;
+  private lastHistorySnapshot: string = '';
 
   constructor() {
     super();
     this.engine = new CalculatorEngine();
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeypadClick = this.handleKeypadClick.bind(this);
+    this.handleHistoryToggleClick = this.handleHistoryToggleClick.bind(this);
+    this.handleClearHistoryClick = this.handleClearHistoryClick.bind(this);
+    this.handleHistoryDrawerClick = this.handleHistoryDrawerClick.bind(this);
     this.setupShadowDOM();
   }
 
@@ -308,6 +517,11 @@ export class StayCalc extends BaseClass {
     this.displayValueEl = shadow.querySelector('#displayValue');
     this.memoryIndicatorEl = shadow.querySelector('#memoryIndicator');
     this.keypadEl = shadow.querySelector('#defaultKeypad');
+    this.historyToggleBtn = shadow.querySelector('#historyToggle');
+    this.historyDrawerEl = shadow.querySelector('#historyDrawer');
+    this.clearHistoryBtn = shadow.querySelector('#clearHistory');
+    this.historyEmptyEl = shadow.querySelector('#historyEmpty');
+    this.historyListEl = shadow.querySelector('#historyList');
   }
 
   public connectedCallback(): void {
@@ -316,6 +530,17 @@ export class StayCalc extends BaseClass {
     // Attach keypad button delegation
     if (this.keypadEl) {
       this.keypadEl.addEventListener('click', this.handleKeypadClick);
+    }
+
+    // Attach history drawer interactions
+    if (this.historyToggleBtn) {
+      this.historyToggleBtn.addEventListener('click', this.handleHistoryToggleClick);
+    }
+    if (this.clearHistoryBtn) {
+      this.clearHistoryBtn.addEventListener('click', this.handleClearHistoryClick);
+    }
+    if (this.historyDrawerEl) {
+      this.historyDrawerEl.addEventListener('click', this.handleHistoryDrawerClick);
     }
 
     // Attach physical keyboard listener to window or host
@@ -333,6 +558,16 @@ export class StayCalc extends BaseClass {
 
     if (this.keypadEl) {
       this.keypadEl.removeEventListener('click', this.handleKeypadClick);
+    }
+
+    if (this.historyToggleBtn) {
+      this.historyToggleBtn.removeEventListener('click', this.handleHistoryToggleClick);
+    }
+    if (this.clearHistoryBtn) {
+      this.clearHistoryBtn.removeEventListener('click', this.handleClearHistoryClick);
+    }
+    if (this.historyDrawerEl) {
+      this.historyDrawerEl.removeEventListener('click', this.handleHistoryDrawerClick);
     }
 
     if (typeof globalThis.window !== 'undefined' && globalThis.window.removeEventListener) {
@@ -354,6 +589,7 @@ export class StayCalc extends BaseClass {
    */
   public reset(): void {
     this.engine = new CalculatorEngine();
+    this.isDrawerOpen = false;
     this.syncUI();
   }
 
@@ -380,6 +616,42 @@ export class StayCalc extends BaseClass {
 
   public pressMemoryClear(): CalculatorState {
     return this.dispatch({ type: 'MEMORY_CLEAR' });
+  }
+
+  public getHistory(): readonly CalculationHistoryEntry[] {
+    return this.engine.getHistory();
+  }
+
+  public clearHistory(): CalculatorState {
+    const state = this.engine.clearHistory();
+    this.syncUI();
+    this.dispatchHistoryEvent();
+    return state;
+  }
+
+  public loadHistoryEntry(entryOrId: CalculationHistoryEntry | string): CalculatorState {
+    const state = this.engine.loadHistoryEntry(entryOrId);
+    this.syncUI();
+    this.dispatchHistoryEvent();
+    return state;
+  }
+
+  public toggleHistoryDrawer(open?: boolean): boolean {
+    this.isDrawerOpen = open !== undefined ? open : !this.isDrawerOpen;
+    this.syncHistoryDrawerUI();
+    return this.isDrawerOpen;
+  }
+
+  public openHistoryDrawer(): void {
+    this.toggleHistoryDrawer(true);
+  }
+
+  public closeHistoryDrawer(): void {
+    this.toggleHistoryDrawer(false);
+  }
+
+  public isHistoryDrawerOpen(): boolean {
+    return this.isDrawerOpen;
   }
 
   /**
@@ -415,6 +687,11 @@ export class StayCalc extends BaseClass {
       case 'memory-clear':
       case 'mc':
         return this.dispatch({ type: 'MEMORY_CLEAR' });
+      case 'history-toggle':
+        this.toggleHistoryDrawer();
+        return this.getState();
+      case 'clear-history':
+        return this.clearHistory();
       default:
         return this.getState();
     }
@@ -424,6 +701,7 @@ export class StayCalc extends BaseClass {
    * Physical keyboard event interceptor complying with RULE-UI-002:
    * Intercepts 0-9, +, -, *, /, Enter, Backspace, Escape, and .
    * Leaves browser hotkeys (Cmd, Ctrl, Alt) untouched.
+   * Dismisses open history drawer on Escape without clearing calculator state.
    */
   public handleKeyDown(event: KeyboardEvent): void {
     if (!event) return;
@@ -453,6 +731,13 @@ export class StayCalc extends BaseClass {
       this.engine.pressBackspace();
     } else if (key === 'Escape') {
       intercepted = true;
+      if (this.isDrawerOpen) {
+        this.closeHistoryDrawer();
+        if (typeof event.preventDefault === 'function') {
+          event.preventDefault();
+        }
+        return; // Do NOT clear calculator registers! (RULE-UI-002)
+      }
       this.engine.pressAllClear();
     } else if (key === 'c' || key === 'C') {
       intercepted = true;
@@ -482,8 +767,134 @@ export class StayCalc extends BaseClass {
     }
   }
 
+  private handleHistoryToggleClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.toggleHistoryDrawer();
+  }
+
+  private handleClearHistoryClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.clearHistory();
+  }
+
+  private handleHistoryDrawerClick(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    if (target.closest && target.closest('#clearHistory')) {
+      this.clearHistory();
+      return;
+    }
+
+    const entryBtn = target.closest ? (target.closest('.history-entry') as HTMLElement | null) : null;
+    if (entryBtn) {
+      const id = entryBtn.getAttribute('data-id');
+      const result = entryBtn.getAttribute('data-result');
+      if (id) {
+        this.loadHistoryEntry(id);
+      } else if (result) {
+        this.loadHistoryEntry(result);
+      }
+    }
+  }
+
+  private syncHistoryDrawerUI(): void {
+    if (this.historyToggleBtn) {
+      this.historyToggleBtn.setAttribute('aria-expanded', this.isDrawerOpen ? 'true' : 'false');
+    }
+    if (this.historyDrawerEl) {
+      this.historyDrawerEl.setAttribute('aria-hidden', this.isDrawerOpen ? 'false' : 'true');
+      if (this.isDrawerOpen) {
+        this.historyDrawerEl.classList.add('open');
+      } else {
+        this.historyDrawerEl.classList.remove('open');
+      }
+    }
+    this.renderHistoryList();
+  }
+
+  private renderHistoryList(): void {
+    const history = this.engine.getHistory();
+    if (this.historyEmptyEl) {
+      if (history.length === 0) {
+        if (this.historyEmptyEl.style) this.historyEmptyEl.style.display = 'block';
+        this.historyEmptyEl.classList.remove('hidden');
+      } else {
+        if (this.historyEmptyEl.style) this.historyEmptyEl.style.display = 'none';
+        this.historyEmptyEl.classList.add('hidden');
+      }
+    }
+
+    if (this.clearHistoryBtn) {
+      if (history.length === 0) {
+        this.clearHistoryBtn.setAttribute('disabled', 'true');
+      } else if (typeof this.clearHistoryBtn.removeAttribute === 'function') {
+        this.clearHistoryBtn.removeAttribute('disabled');
+      } else {
+        this.clearHistoryBtn.setAttribute('disabled', 'false');
+      }
+    }
+
+    if (this.historyListEl) {
+      // Clear existing children
+      this.historyListEl.textContent = '';
+      if ((this.historyListEl as any).children) {
+        (this.historyListEl as any).children = [];
+      }
+
+      for (const entry of history) {
+        const btn = typeof globalThis.document !== 'undefined' && globalThis.document.createElement
+          ? globalThis.document.createElement('button')
+          : null;
+        if (!btn) continue;
+
+        btn.setAttribute('type', 'button');
+        btn.setAttribute('class', 'history-entry');
+        if (btn.classList && typeof btn.classList.add === 'function') {
+          btn.classList.add('history-entry');
+        }
+        btn.setAttribute('data-id', entry.id);
+        btn.setAttribute('data-result', entry.result);
+        btn.setAttribute('aria-label', `${entry.expression} equals ${entry.result}`);
+
+        const exprSpan = globalThis.document.createElement('span');
+        exprSpan.setAttribute('class', 'history-entry-expr');
+        if (exprSpan.classList && typeof exprSpan.classList.add === 'function') {
+          exprSpan.classList.add('history-entry-expr');
+        }
+        exprSpan.textContent = `${entry.expression} =`;
+
+        const resSpan = globalThis.document.createElement('span');
+        resSpan.setAttribute('class', 'history-entry-result');
+        if (resSpan.classList && typeof resSpan.classList.add === 'function') {
+          resSpan.classList.add('history-entry-result');
+        }
+        resSpan.textContent = entry.result;
+
+        btn.appendChild(exprSpan);
+        btn.appendChild(resSpan);
+        this.historyListEl.appendChild(btn);
+      }
+    }
+  }
+
+  private dispatchHistoryEvent(): void {
+    if (typeof this.dispatchEvent === 'function') {
+      const historyEvent = new CustomEvent('history-change', {
+        detail: { history: this.engine.getHistory() },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(historyEvent);
+    }
+  }
+
   /**
-   * Synchronizes visual display, ARIA live region, and dispatches calc-change event (SEAM-UI-01).
+   * Synchronizes visual display, ARIA live region, history drawer, and dispatches events.
    */
   public syncUI(): void {
     const state = this.engine.getState();
@@ -532,6 +943,17 @@ export class StayCalc extends BaseClass {
       if ((slottedMemory as HTMLElement).style) {
         (slottedMemory as HTMLElement).style.visibility = state.hasActiveMemory ? 'visible' : 'hidden';
       }
+    }
+
+    // Sync History Drawer UI
+    this.syncHistoryDrawerUI();
+
+    // Check if history mutated to dispatch history-change
+    const currentHistory = this.engine.getHistory();
+    const currentSnapshot = JSON.stringify(currentHistory);
+    if (currentSnapshot !== this.lastHistorySnapshot) {
+      this.lastHistorySnapshot = currentSnapshot;
+      this.dispatchHistoryEvent();
     }
 
     // Dispatch SEAM-UI-01 calc-change custom event
