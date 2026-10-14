@@ -39,6 +39,16 @@ export interface CalculationHistoryEntry {
   readonly radix?: MultiRadixValues;
 }
 
+export type HistoryExportFormat = 'text' | 'csv';
+
+export interface HistoryExportResult {
+  readonly format: HistoryExportFormat;
+  readonly content: string;
+  readonly count: number;
+  readonly total: number;
+}
+
+
 export type ActionType =
   | 'DIGIT'
   | 'DECIMAL'
