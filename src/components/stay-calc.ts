@@ -23,6 +23,12 @@ import {
   CalculatorEngine,
   createInitialState,
 } from '../engine/calculator-engine.ts';
+import {
+  convertUnits,
+  getUnitsForCategory,
+  DEFAULT_UNITS,
+  isUnitCategory,
+} from '../engine/converter.ts';
 import type {
   CalculatorAction,
   CalculatorState,
@@ -35,6 +41,9 @@ import type {
   Radix,
   MultiRadixValues,
   CalculatorTheme,
+  UnitCategory,
+  ConversionUnit,
+  ConversionResult,
 } from '../engine/types.ts';
 
 export const THEME_STORAGE_KEY = 'staycalc_theme';
@@ -196,16 +205,23 @@ const TEMPLATE_STYLES = `
   :host([data-theme="high-contrast"]) .angle-unit-toggle-btn,
   :host([data-theme="high-contrast"]) .history-toggle-btn,
   :host([data-theme="high-contrast"]) .theme-toggle-btn,
+  :host([data-theme="high-contrast"]) .converter-toggle-btn,
   :host([data-theme="high-contrast"]) .multi-radix-preview,
   :host([data-theme="high-contrast"]) .history-drawer,
   :host([data-theme="high-contrast"]) .history-action-btn,
   :host([data-theme="high-contrast"]) .clear-history-btn,
   :host([data-theme="high-contrast"]) .history-entry,
+  :host([data-theme="high-contrast"]) .converter-drawer,
+  :host([data-theme="high-contrast"]) .converter-select,
+  :host([data-theme="high-contrast"]) .converter-input,
+  :host([data-theme="high-contrast"]) .converter-output,
+  :host([data-theme="high-contrast"]) .converter-load-btn,
   :host([data-theme="high-contrast"]) .toast-notification {
     border: 2px solid #ffffff;
   }
 
-  :host([data-theme="high-contrast"]) .btn-equals {
+  :host([data-theme="high-contrast"]) .btn-equals,
+  :host([data-theme="high-contrast"]) .converter-load-btn {
     background-color: #000000;
     color: #ffffff;
     border: 2px solid #ffffff;
@@ -219,6 +235,10 @@ const TEMPLATE_STYLES = `
   :host([data-theme="high-contrast"]) .angle-unit-toggle-btn:focus-visible,
   :host([data-theme="high-contrast"]) .history-toggle-btn:focus-visible,
   :host([data-theme="high-contrast"]) .theme-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .converter-toggle-btn:focus-visible,
+  :host([data-theme="high-contrast"]) .converter-select:focus-visible,
+  :host([data-theme="high-contrast"]) .converter-input:focus-visible,
+  :host([data-theme="high-contrast"]) .converter-load-btn:focus-visible,
   :host([data-theme="high-contrast"]) .history-action-btn:focus-visible,
   :host([data-theme="high-contrast"]) .clear-history-btn:focus-visible,
   :host([data-theme="high-contrast"]) .history-entry:focus-visible {
@@ -315,7 +335,7 @@ const TEMPLATE_STYLES = `
     gap: 6px;
   }
 
-  .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn {
+  .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn, .converter-toggle-btn {
     appearance: none;
     -webkit-appearance: none;
     border: 1px solid var(--calc-outline-low, #e4e4e7);
@@ -334,11 +354,11 @@ const TEMPLATE_STYLES = `
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
 
-  .mode-toggle-btn:hover, .angle-unit-toggle-btn:hover, .history-toggle-btn:hover, .theme-toggle-btn:hover {
+  .mode-toggle-btn:hover, .angle-unit-toggle-btn:hover, .history-toggle-btn:hover, .theme-toggle-btn:hover, .converter-toggle-btn:hover {
     background-color: var(--calc-container-low, #e4e4e7);
   }
 
-  .mode-toggle-btn:focus-visible, .angle-unit-toggle-btn:focus-visible, .history-toggle-btn:focus-visible, .theme-toggle-btn:focus-visible {
+  .mode-toggle-btn:focus-visible, .angle-unit-toggle-btn:focus-visible, .history-toggle-btn:focus-visible, .theme-toggle-btn:focus-visible, .converter-toggle-btn:focus-visible {
     outline: 2px solid var(--calc-focus-ring, var(--calc-primary, #2563eb));
     outline-offset: 2px;
   }
@@ -722,6 +742,159 @@ const TEMPLATE_STYLES = `
     transform: scale(0.97);
   }
 
+  /* Converter Drawer */
+  .converter-drawer {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    inline-size: 100%;
+    padding-inline: 14px;
+    padding-block: 12px;
+    background-color: var(--calc-surface, #f4f4f5);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 12px;
+    box-sizing: border-box;
+  }
+
+  .converter-drawer.open {
+    display: flex;
+  }
+
+  .converter-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    inline-size: 100%;
+    padding-block-end: 6px;
+    border-block-end: 1px solid var(--calc-outline-low, #e4e4e7);
+  }
+
+  .converter-drawer-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--calc-text-primary, #09090b);
+  }
+
+  .converter-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    inline-size: 100%;
+  }
+
+  .converter-units-row, .converter-input-output-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    inline-size: 100%;
+  }
+
+  .converter-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .converter-output-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .converter-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--calc-text-secondary, #71717a);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .converter-select, .converter-input {
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    inline-size: 100%;
+    block-size: 34px;
+    padding-inline: 8px;
+    padding-block: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--calc-text-primary, #09090b);
+    background-color: var(--calc-container-low, #e4e4e7);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 8px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .converter-select:focus-visible, .converter-input:focus-visible {
+    outline: 2px solid var(--calc-focus-ring, var(--calc-primary, #2563eb));
+    outline-offset: 1px;
+  }
+
+  .converter-output {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    inline-size: 100%;
+    block-size: 34px;
+    padding-inline: 8px;
+    padding-block: 4px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--calc-text-primary, #09090b);
+    background-color: var(--calc-container-lowest, #ffffff);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .converter-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-block-start: 16px;
+    color: var(--calc-text-secondary, #71717a);
+    font-size: 14px;
+  }
+
+  .converter-actions-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding-block-start: 4px;
+  }
+
+  .converter-load-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--calc-primary, #2563eb);
+    background-color: var(--calc-primary, #2563eb);
+    color: var(--calc-on-primary, #ffffff);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    padding-inline: 12px;
+    padding-block: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .converter-load-btn:hover {
+    background-color: #1d4ed8;
+  }
+
+  .converter-load-btn:focus-visible {
+    outline: 2px solid var(--calc-focus-ring, var(--calc-primary, #2563eb));
+    outline-offset: 2px;
+  }
+
   .toast-notification {
     display: none;
     position: absolute;
@@ -817,10 +990,33 @@ const TEMPLATE_STYLES = `
     .header-left, .header-right {
       gap: 4px;
     }
-    .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn {
+    .mode-toggle-btn, .angle-unit-toggle-btn, .history-toggle-btn, .theme-toggle-btn, .converter-toggle-btn {
       padding-inline: 6px;
       padding-block: 4px;
       font-size: 11px;
+    }
+    .converter-drawer {
+      padding-inline: 10px;
+      padding-block: 8px;
+      gap: 6px;
+    }
+    .converter-units-row, .converter-input-output-group {
+      gap: 6px;
+    }
+    .converter-select, .converter-input {
+      font-size: 12px;
+      block-size: 30px;
+      padding-inline: 6px;
+    }
+    .converter-output {
+      font-size: 13px;
+      block-size: 30px;
+      padding-inline: 6px;
+    }
+    .converter-load-btn {
+      font-size: 11px;
+      padding-inline: 8px;
+      padding-block: 5px;
     }
     .history-drawer {
       max-block-size: 200px;
@@ -930,6 +1126,18 @@ const TEMPLATE_HTML = `
       <div class="header-right">
         <button
           type="button"
+          class="converter-toggle-btn"
+          id="converterToggle"
+          data-action="converter-toggle"
+          aria-expanded="false"
+          aria-controls="converterDrawer"
+          aria-label="Toggle unit converter"
+          title="Unit Converter"
+        >
+          <span aria-hidden="true">⇄</span> Converter
+        </button>
+        <button
+          type="button"
           class="theme-toggle-btn"
           id="themeToggle"
           data-action="cycle-theme"
@@ -1012,6 +1220,85 @@ const TEMPLATE_HTML = `
       </div>
       <div class="history-empty" id="historyEmpty">No calculations yet</div>
       <div class="history-list" id="historyList" role="list"></div>
+    </div>
+    <div
+      class="converter-drawer"
+      id="converterDrawer"
+      role="region"
+      aria-label="Unit Converter"
+      aria-hidden="true"
+      style="display: none;"
+    >
+      <div class="converter-drawer-header">
+        <span class="converter-drawer-title">Unit Converter</span>
+      </div>
+      <div class="converter-controls">
+        <div class="converter-control-group">
+          <label for="converterCategory" class="converter-label">Category</label>
+          <select id="converterCategory" class="converter-select" aria-label="Unit category">
+            <option value="length">Length</option>
+            <option value="mass">Mass</option>
+            <option value="temperature">Temperature</option>
+          </select>
+        </div>
+        <div class="converter-units-row">
+          <div class="converter-control-group">
+            <label for="converterSourceUnit" class="converter-label">From</label>
+            <select id="converterSourceUnit" class="converter-select" aria-label="Source unit">
+              <option value="cm">Centimeters (cm)</option>
+              <option value="m">Meters (m)</option>
+              <option value="km">Kilometers (km)</option>
+              <option value="in">Inches (in)</option>
+              <option value="ft">Feet (ft)</option>
+            </select>
+          </div>
+          <div class="converter-arrow" aria-hidden="true">➔</div>
+          <div class="converter-control-group">
+            <label for="converterTargetUnit" class="converter-label">To</label>
+            <select id="converterTargetUnit" class="converter-select" aria-label="Target unit">
+              <option value="cm">Centimeters (cm)</option>
+              <option value="m" selected>Meters (m)</option>
+              <option value="km">Kilometers (km)</option>
+              <option value="in">Inches (in)</option>
+              <option value="ft">Feet (ft)</option>
+            </select>
+          </div>
+        </div>
+        <div class="converter-input-output-group">
+          <div class="converter-control-group">
+            <label for="converterInput" class="converter-label">Value</label>
+            <input
+              type="text"
+              id="converterInput"
+              class="converter-input"
+              aria-label="Value to convert"
+              placeholder="0"
+              autocomplete="off"
+            />
+          </div>
+          <div class="converter-output-group">
+            <span class="converter-label">Result</span>
+            <div
+              id="converterOutput"
+              class="converter-output"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >-</div>
+          </div>
+        </div>
+        <div class="converter-actions-bar">
+          <button
+            type="button"
+            class="converter-load-btn"
+            id="btnLoadConvertedValue"
+            data-action="load-converted-value"
+            aria-label="Load converted value into calculator"
+          >
+            Load Result
+          </button>
+        </div>
+      </div>
     </div>
     <div class="display-slot-wrapper">
       <slot name="display">
@@ -1187,6 +1474,16 @@ export class StayCalc extends BaseClass {
   private toastNotificationEl: HTMLElement | null = null;
   private themeToggleBtn: HTMLElement | null = null;
   private themeIconEl: HTMLElement | null = null;
+  private converterToggleBtn: HTMLElement | null = null;
+  private converterDrawerEl: HTMLElement | null = null;
+  private converterCategoryEl: HTMLSelectElement | null = null;
+  private converterSourceUnitEl: HTMLSelectElement | null = null;
+  private converterTargetUnitEl: HTMLSelectElement | null = null;
+  private converterInputEl: HTMLInputElement | null = null;
+  private converterOutputEl: HTMLElement | null = null;
+  private btnLoadConvertedValue: HTMLElement | null = null;
+  private isConverterOpen = false;
+  private currentConversionResult: ConversionResult = { value: 0, formatted: '-' };
   private toastTimer: any = null;
   private isDrawerOpen = false;
   private isConnectedToDOM = false;
@@ -1199,6 +1496,11 @@ export class StayCalc extends BaseClass {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeypadClick = this.handleKeypadClick.bind(this);
     this.handleThemeToggleClick = this.handleThemeToggleClick.bind(this);
+    this.handleConverterToggleClick = this.handleConverterToggleClick.bind(this);
+    this.handleConverterCategoryChange = this.handleConverterCategoryChange.bind(this);
+    this.handleConverterUnitChange = this.handleConverterUnitChange.bind(this);
+    this.handleConverterInputChange = this.handleConverterInputChange.bind(this);
+    this.handleLoadConvertedValueClick = this.handleLoadConvertedValueClick.bind(this);
     this.handleHistoryToggleClick = this.handleHistoryToggleClick.bind(this);
     this.handleClearHistoryClick = this.handleClearHistoryClick.bind(this);
     this.handleHistoryDrawerClick = this.handleHistoryDrawerClick.bind(this);
@@ -1251,6 +1553,14 @@ export class StayCalc extends BaseClass {
     this.toastNotificationEl = shadow.querySelector('#toastNotification');
     this.themeToggleBtn = shadow.querySelector('#themeToggle');
     this.themeIconEl = shadow.querySelector('#themeIcon');
+    this.converterToggleBtn = shadow.querySelector('#converterToggle');
+    this.converterDrawerEl = shadow.querySelector('#converterDrawer');
+    this.converterCategoryEl = shadow.querySelector('#converterCategory');
+    this.converterSourceUnitEl = shadow.querySelector('#converterSourceUnit');
+    this.converterTargetUnitEl = shadow.querySelector('#converterTargetUnit');
+    this.converterInputEl = shadow.querySelector('#converterInput');
+    this.converterOutputEl = shadow.querySelector('#converterOutput');
+    this.btnLoadConvertedValue = shadow.querySelector('#btnLoadConvertedValue');
   }
 
   public connectedCallback(): void {
@@ -1321,6 +1631,24 @@ export class StayCalc extends BaseClass {
     if (this.multiRadixPreviewEl) {
       this.multiRadixPreviewEl.addEventListener('click', this.handleMultiRadixPreviewClick);
     }
+    if (this.converterToggleBtn) {
+      this.converterToggleBtn.addEventListener('click', this.handleConverterToggleClick);
+    }
+    if (this.converterCategoryEl) {
+      this.converterCategoryEl.addEventListener('change', this.handleConverterCategoryChange);
+    }
+    if (this.converterSourceUnitEl) {
+      this.converterSourceUnitEl.addEventListener('change', this.handleConverterUnitChange);
+    }
+    if (this.converterTargetUnitEl) {
+      this.converterTargetUnitEl.addEventListener('change', this.handleConverterUnitChange);
+    }
+    if (this.converterInputEl) {
+      this.converterInputEl.addEventListener('input', this.handleConverterInputChange);
+    }
+    if (this.btnLoadConvertedValue) {
+      this.btnLoadConvertedValue.addEventListener('click', this.handleLoadConvertedValueClick);
+    }
 
     if (typeof globalThis.window !== 'undefined' && globalThis.window.addEventListener) {
       globalThis.window.addEventListener('keydown', this.handleKeyDown);
@@ -1386,6 +1714,24 @@ export class StayCalc extends BaseClass {
     }
     if (this.btnExportCsv) {
       this.btnExportCsv.removeEventListener('click', this.handleExportCsvClick);
+    }
+    if (this.converterToggleBtn) {
+      this.converterToggleBtn.removeEventListener('click', this.handleConverterToggleClick);
+    }
+    if (this.converterCategoryEl) {
+      this.converterCategoryEl.removeEventListener('change', this.handleConverterCategoryChange);
+    }
+    if (this.converterSourceUnitEl) {
+      this.converterSourceUnitEl.removeEventListener('change', this.handleConverterUnitChange);
+    }
+    if (this.converterTargetUnitEl) {
+      this.converterTargetUnitEl.removeEventListener('change', this.handleConverterUnitChange);
+    }
+    if (this.converterInputEl) {
+      this.converterInputEl.removeEventListener('input', this.handleConverterInputChange);
+    }
+    if (this.btnLoadConvertedValue) {
+      this.btnLoadConvertedValue.removeEventListener('click', this.handleLoadConvertedValueClick);
     }
 
     if (typeof globalThis.window !== 'undefined' && globalThis.window.removeEventListener) {
@@ -1747,6 +2093,12 @@ export class StayCalc extends BaseClass {
       return;
     }
 
+    // Never intercept keystrokes when user is typing inside an input, select, or textarea
+    const target = (event.target || (event as any).composedPath?.()[0]) as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+      return;
+    }
+
     const key = event.key;
     let intercepted = false;
     const isProgrammer = this.engine.getMode() === 'programmer';
@@ -2083,6 +2435,145 @@ export class StayCalc extends BaseClass {
     }
   }
 
+  public toggleConverter(): void {
+    this.isConverterOpen = !this.isConverterOpen;
+    this.syncConverterDrawerUI();
+  }
+
+  public openConverter(): void {
+    this.isConverterOpen = true;
+    this.syncConverterDrawerUI();
+  }
+
+  public closeConverter(): void {
+    this.isConverterOpen = false;
+    this.syncConverterDrawerUI();
+  }
+
+  public getIsConverterOpen(): boolean {
+    return this.isConverterOpen;
+  }
+
+  public syncConverterDrawerUI(): void {
+    if (this.converterToggleBtn) {
+      this.converterToggleBtn.setAttribute('aria-expanded', this.isConverterOpen ? 'true' : 'false');
+    }
+    if (this.converterDrawerEl) {
+      this.converterDrawerEl.setAttribute('aria-hidden', this.isConverterOpen ? 'false' : 'true');
+      if (this.isConverterOpen) {
+        this.converterDrawerEl.classList.add('open');
+        if (this.converterDrawerEl.style) {
+          this.converterDrawerEl.style.display = 'flex';
+        }
+      } else {
+        this.converterDrawerEl.classList.remove('open');
+        if (this.converterDrawerEl.style) {
+          this.converterDrawerEl.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  public populateUnitSelects(category: UnitCategory): void {
+    const units = getUnitsForCategory(category);
+    const defaults = DEFAULT_UNITS[category] ?? { source: units[0].value, target: units[1]?.value ?? units[0].value };
+
+    if (this.converterSourceUnitEl) {
+      this.converterSourceUnitEl.innerHTML = units
+        .map((u) => `<option value="${u.value}"${u.value === defaults.source ? ' selected' : ''}>${u.label}</option>`)
+        .join('');
+      this.converterSourceUnitEl.value = defaults.source;
+    }
+
+    if (this.converterTargetUnitEl) {
+      this.converterTargetUnitEl.innerHTML = units
+        .map((u) => `<option value="${u.value}"${u.value === defaults.target ? ' selected' : ''}>${u.label}</option>`)
+        .join('');
+      this.converterTargetUnitEl.value = defaults.target;
+    }
+  }
+
+  public recomputeConversion(): void {
+    const category = (this.converterCategoryEl?.value as UnitCategory) || 'length';
+    const sourceUnit = this.converterSourceUnitEl?.value || 'cm';
+    const targetUnit = this.converterTargetUnitEl?.value || 'm';
+    const inputValue = this.converterInputEl?.value ?? '';
+
+    const result = convertUnits(category, sourceUnit, targetUnit, inputValue);
+    this.currentConversionResult = result;
+
+    if (this.converterOutputEl) {
+      this.converterOutputEl.textContent = result.formatted;
+    }
+
+    if (typeof this.dispatchEvent === 'function') {
+      const event = new CustomEvent('unit-convert', {
+        detail: {
+          category,
+          sourceUnit,
+          targetUnit,
+          inputValue,
+          convertedValue: result.value,
+          formatted: result.formatted,
+          error: result.error,
+        },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(event);
+    }
+  }
+
+  public convertUnits(
+    category: UnitCategory,
+    sourceUnit: string,
+    targetUnit: string,
+    inputValue: string | number
+  ): ConversionResult {
+    return convertUnits(category, sourceUnit, targetUnit, inputValue);
+  }
+
+  private handleConverterToggleClick(event: Event): void {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    this.toggleConverter();
+  }
+
+  private handleConverterCategoryChange = (): void => {
+    if (!this.converterCategoryEl) return;
+    const category = this.converterCategoryEl.value as UnitCategory;
+    if (!isUnitCategory(category)) return;
+
+    this.populateUnitSelects(category);
+    this.recomputeConversion();
+  };
+
+  private handleConverterUnitChange = (): void => {
+    this.recomputeConversion();
+  };
+
+  private handleConverterInputChange = (): void => {
+    this.recomputeConversion();
+  };
+
+  private handleLoadConvertedValueClick = (event: Event): void => {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    if (this.currentConversionResult.error || !Number.isFinite(this.currentConversionResult.value)) {
+      return;
+    }
+    const convertedValStr = this.currentConversionResult.formatted;
+    if (!convertedValStr || convertedValStr === '-') {
+      return;
+    }
+
+    this.engine.loadBuffer(convertedValStr);
+    this.syncUI();
+    this.showToast('Loaded into calculator');
+  };
+
   private dispatchHistoryEvent(): void {
     if (typeof this.dispatchEvent === 'function') {
       const historyEvent = new CustomEvent('history-change', {
@@ -2373,6 +2864,9 @@ export class StayCalc extends BaseClass {
 
     // Sync History Drawer UI
     this.syncHistoryDrawerUI();
+
+    // Sync Converter Drawer UI
+    this.syncConverterDrawerUI();
 
     // Check if mode/angleUnit/radix mutated to dispatch mode-change
     const currentModeSnapshot = `${state.mode}:${state.angleUnit}:${state.radix}`;
