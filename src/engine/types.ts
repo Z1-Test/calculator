@@ -1,7 +1,12 @@
 /**
  * Supported arithmetic operators for CalcEngine.
  */
-export type Operator = "+" | "-" | "*" | "/";
+export type Operator = "+" | "-" | "*" | "/" | "^";
+
+/**
+ * Angle measurement mode for trigonometric operations.
+ */
+export type AngleMode = "DEG" | "RAD";
 
 /**
  * Snapshot representation of the CalcEngine's internal register state.
@@ -27,6 +32,8 @@ export interface CalcEngineState {
   hasMemory: boolean;
   /** Calculation history tape records (up to 50 entries) */
   history: CalculationRecord[];
+  /** Active angle mode for trigonometric calculations (DEG or RAD) */
+  angleMode: AngleMode;
 }
 
 /**

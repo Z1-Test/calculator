@@ -702,4 +702,291 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(engine.getHistory().length, 0);
     });
   });
+
+  describe("10. Scientific Operations & Angle Modes (CASE-SCI-01 to CASE-SCI-08)", () => {
+    it("should initialize in DEG mode and toggle between DEG and RAD (CASE-SCI-01)", () => {
+      const engine = new CalcEngine();
+      assert.equal(engine.getAngleMode(), "DEG");
+      assert.equal(engine.getState().angleMode, "DEG");
+
+      assert.equal(engine.toggleAngleMode(), "RAD");
+      assert.equal(engine.getAngleMode(), "RAD");
+      assert.equal(engine.getState().angleMode, "RAD");
+
+      assert.equal(engine.toggleAngleMode(), "DEG");
+      assert.equal(engine.getAngleMode(), "DEG");
+    });
+
+    it("should preserve active buffer, memory, and history across angle mode toggle (NEVER-CALC-002)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("4");
+      engine.inputDigit("2");
+      engine.memoryAdd();
+      assert.equal(engine.getDisplay(), "42");
+
+      engine.toggleAngleMode();
+      assert.equal(engine.getDisplay(), "42");
+      assert.equal(engine.hasMemory(), true);
+      assert.equal(engine.getMemoryValue(), 42);
+    });
+
+    it("should evaluate trigonometric functions in DEG mode (CASE-SCI-02)", () => {
+      const engine = new CalcEngine();
+      // sin(30) = 0.5
+      engine.inputDigit("3");
+      engine.inputDigit("0");
+      engine.sin();
+      assert.equal(engine.getDisplay(), "0.5");
+
+      // sin(90) = 1
+      engine.clear();
+      engine.inputDigit("9");
+      engine.inputDigit("0");
+      engine.sin();
+      assert.equal(engine.getDisplay(), "1");
+
+      // sin(180) = 0
+      engine.clear();
+      engine.inputDigit("1");
+      engine.inputDigit("8");
+      engine.inputDigit("0");
+      engine.sin();
+      assert.equal(engine.getDisplay(), "0");
+
+      // cos(60) = 0.5
+      engine.clear();
+      engine.inputDigit("6");
+      engine.inputDigit("0");
+      engine.cos();
+      assert.equal(engine.getDisplay(), "0.5");
+
+      // cos(90) = 0
+      engine.clear();
+      engine.inputDigit("9");
+      engine.inputDigit("0");
+      engine.cos();
+      assert.equal(engine.getDisplay(), "0");
+
+      // tan(45) = 1
+      engine.clear();
+      engine.inputDigit("4");
+      engine.inputDigit("5");
+      engine.tan();
+      assert.equal(engine.getDisplay(), "1");
+
+      // tan(0) = 0
+      engine.clear();
+      engine.inputDigit("0");
+      engine.tan();
+      assert.equal(engine.getDisplay(), "0");
+    });
+
+    it("should evaluate trigonometric functions in RAD mode (CASE-SCI-03)", () => {
+      const engine = new CalcEngine();
+      engine.toggleAngleMode(); // switch to RAD
+      assert.equal(engine.getAngleMode(), "RAD");
+
+      // sin(0) = 0
+      engine.inputDigit("0");
+      engine.sin();
+      assert.equal(engine.getDisplay(), "0");
+
+      // cos(0) = 1
+      engine.clear();
+      engine.inputDigit("0");
+      engine.cos();
+      assert.equal(engine.getDisplay(), "1");
+
+      // cos(pi) = -1
+      engine.clear();
+      engine.inputConstant("pi");
+      engine.cos();
+      assert.equal(engine.getDisplay(), "-1");
+    });
+
+    it("should evaluate power operations x^y and x² (CASE-SCI-04)", () => {
+      const engine = new CalcEngine();
+      // 2 ^ 3 = 8
+      engine.inputDigit("2");
+      engine.inputOperator("^");
+      engine.inputDigit("3");
+      assert.equal(engine.calculate(), "8");
+
+      // 5² = 25
+      engine.clear();
+      engine.inputDigit("5");
+      engine.square();
+      assert.equal(engine.getDisplay(), "25");
+
+      // 10 ^ -1 = 0.1 via decimal
+      engine.clear();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("^");
+      engine.inputDigit("2");
+      assert.equal(engine.calculate(), "100");
+    });
+
+    it("should evaluate square root and reciprocal (CASE-SCI-05)", () => {
+      const engine = new CalcEngine();
+      // sqrt(16) = 4
+      engine.inputDigit("1");
+      engine.inputDigit("6");
+      engine.sqrt();
+      assert.equal(engine.getDisplay(), "4");
+
+      // sqrt(0) = 0
+      engine.clear();
+      engine.inputDigit("0");
+      engine.sqrt();
+      assert.equal(engine.getDisplay(), "0");
+
+      // 1/4 = 0.25
+      engine.clear();
+      engine.inputDigit("4");
+      engine.reciprocal();
+      assert.equal(engine.getDisplay(), "0.25");
+    });
+
+    it("should evaluate natural logarithm and common logarithm (CASE-SCI-06)", () => {
+      const engine = new CalcEngine();
+      // ln(1) = 0
+      engine.inputDigit("1");
+      engine.ln();
+      assert.equal(engine.getDisplay(), "0");
+
+      // ln(e) = 1
+      engine.clear();
+      engine.inputConstant("e");
+      engine.ln();
+      assert.equal(engine.getDisplay(), "1");
+
+      // log(100) = 2
+      engine.clear();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputDigit("0");
+      engine.log();
+      assert.equal(engine.getDisplay(), "2");
+
+      // log(1) = 0
+      engine.clear();
+      engine.inputDigit("1");
+      engine.log();
+      assert.equal(engine.getDisplay(), "0");
+    });
+
+    it("should insert mathematical constants pi and e into buffer (CASE-SCI-07)", () => {
+      const engine = new CalcEngine();
+      engine.inputConstant("pi");
+      assert.equal(engine.getDisplay(), "3.1415926536");
+
+      // Subsequent digit entry starts fresh operand
+      engine.inputDigit("9");
+      assert.equal(engine.getDisplay(), "9");
+
+      engine.clear();
+      engine.inputConstant("e");
+      assert.equal(engine.getDisplay(), "2.7182818285");
+    });
+
+    it("should handle domain boundary errors and lock input (CASE-SCI-08)", () => {
+      const engine = new CalcEngine();
+
+      // sqrt(-4) -> Invalid input
+      engine.inputDigit("0");
+      engine.inputOperator("-");
+      engine.inputDigit("4");
+      assert.equal(engine.calculate(), "-4");
+      engine.sqrt();
+      assert.equal(engine.getDisplay(), "Invalid input");
+      assert.equal(engine.getState().isLocked, true);
+
+      // Input rejected while locked
+      engine.inputDigit("5");
+      assert.equal(engine.getDisplay(), "Invalid input");
+
+      // Clear unlocks engine
+      engine.clear();
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.getState().isLocked, false);
+
+      // ln(0) -> Invalid input
+      engine.inputDigit("0");
+      engine.ln();
+      assert.equal(engine.getDisplay(), "Invalid input");
+      assert.equal(engine.getState().isLocked, true);
+
+      engine.allClear();
+      assert.equal(engine.getDisplay(), "0");
+
+      // log(0) -> Invalid input
+      engine.inputDigit("0");
+      engine.log();
+      assert.equal(engine.getDisplay(), "Invalid input");
+      assert.equal(engine.getState().isLocked, true);
+
+      engine.clear();
+
+      // reciprocal(0) -> Cannot divide by zero
+      engine.inputDigit("0");
+      engine.reciprocal();
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
+      assert.equal(engine.getState().isLocked, true);
+
+      engine.clear();
+
+      // tan(90) in DEG -> Invalid input
+      engine.inputDigit("9");
+      engine.inputDigit("0");
+      engine.tan();
+      assert.equal(engine.getDisplay(), "Invalid input");
+      assert.equal(engine.getState().isLocked, true);
+
+      engine.clear();
+
+      // 0 ^ -2 -> Cannot divide by zero
+      engine.allClear();
+      engine.inputDigit("2");
+      engine.memorySubtract(); // memory = -2
+      engine.allClear();
+      engine.inputDigit("0");
+      engine.inputOperator("^");
+      engine.memoryRecall(); // buffer is "-2"
+      assert.equal(engine.calculate(), "Cannot divide by zero");
+
+      engine.clear();
+
+      // (-4) ^ 0.5 -> Invalid input
+      engine.inputDigit("0");
+      engine.inputOperator("-");
+      engine.inputDigit("4");
+      engine.inputOperator("^");
+      engine.inputDigit("0");
+      engine.inputDecimal();
+      engine.inputDigit("5");
+      assert.equal(engine.calculate(), "Invalid input");
+    });
+
+    it("should support chained operations with scientific functions", () => {
+      const engine = new CalcEngine();
+      // 10 + sin(30) = 10.5
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("+");
+      engine.inputDigit("3");
+      engine.inputDigit("0");
+      engine.sin(); // 0.5
+      assert.equal(engine.calculate(), "10.5");
+
+      // 2 + 5² = 27
+      engine.clear();
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("5");
+      engine.square(); // 25
+      assert.equal(engine.calculate(), "27");
+    });
+  });
 });
+
