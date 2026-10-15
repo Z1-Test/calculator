@@ -16,6 +16,8 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(state.isLocked, false);
       assert.equal(state.errorMessage, null);
       assert.equal(state.display, "0");
+      assert.equal(state.memory, 0);
+      assert.equal(state.hasMemory, false);
     });
   });
 
@@ -335,6 +337,168 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       engine.inputDigit("4");
       engine.inputDigit("2");
       assert.equal(engine.calculate(), "42");
+    });
+  });
+
+  describe("8. Memory Registers & Persistence (M+, M-, MR, MC)", () => {
+    it("should initialize with memory = 0 and hasMemory() = false", () => {
+      const engine = new CalcEngine();
+      assert.equal(engine.getMemoryValue(), 0);
+      assert.equal(engine.hasMemory(), false);
+    });
+
+    it("should add to memory with M+ and set hasMemory to true", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("4");
+      engine.inputDigit("2");
+      engine.memoryAdd();
+      assert.equal(engine.getMemoryValue(), 42);
+      assert.equal(engine.hasMemory(), true);
+      // Display value should be preserved
+      assert.equal(engine.getDisplay(), "42");
+    });
+
+    it("should start fresh operand for next digit entry after M+", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("5");
+      engine.memoryAdd();
+      engine.inputDigit("3");
+      assert.equal(engine.getDisplay(), "3");
+    });
+
+    it("should accumulate running totals across multiple M+ calls", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("5");
+      engine.memoryAdd(); // memory = 15
+      engine.inputDigit("2");
+      engine.inputDigit("5");
+      engine.memoryAdd(); // memory = 40
+      assert.equal(engine.getMemoryValue(), 40);
+      assert.equal(engine.hasMemory(), true);
+    });
+
+    it("should subtract from memory with M- and transition hasMemory to false when reaching 0", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("5");
+      engine.inputDigit("0");
+      engine.memoryAdd(); // memory = 50
+      assert.equal(engine.hasMemory(), true);
+
+      engine.inputDigit("2");
+      engine.inputDigit("0");
+      engine.memorySubtract(); // memory = 30
+      assert.equal(engine.getMemoryValue(), 30);
+      assert.equal(engine.hasMemory(), true);
+
+      engine.inputDigit("3");
+      engine.inputDigit("0");
+      engine.memorySubtract(); // memory = 0
+      assert.equal(engine.getMemoryValue(), 0);
+      assert.equal(engine.hasMemory(), false);
+    });
+
+    it("should handle negative memory values with M- and maintain hasMemory = true", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.memorySubtract(); // memory = -10
+      assert.equal(engine.getMemoryValue(), -10);
+      assert.equal(engine.hasMemory(), true);
+    });
+
+    it("should recall memory with MR into active display buffer and allow chained operations", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("2");
+      engine.inputDigit("5");
+      engine.memoryAdd(); // memory = 25
+
+      engine.clear();
+      assert.equal(engine.getDisplay(), "0");
+
+      engine.inputDigit("5");
+      engine.inputOperator("+");
+      engine.memoryRecall(); // active buffer = 25
+      assert.equal(engine.getDisplay(), "25");
+
+      const result = engine.calculate();
+      assert.equal(result, "30");
+      assert.equal(engine.getDisplay(), "30");
+    });
+
+    it("should safely recall 0 when memory is empty", () => {
+      const engine = new CalcEngine();
+      engine.memoryRecall();
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.hasMemory(), false);
+    });
+
+    it("should reset memory register to 0 with MC", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("9");
+      engine.inputDigit("9");
+      engine.memoryAdd();
+      assert.equal(engine.hasMemory(), true);
+
+      engine.memoryClear();
+      assert.equal(engine.getMemoryValue(), 0);
+      assert.equal(engine.hasMemory(), false);
+    });
+
+    it("should preserve memory register across Clear Entry (C) and All Clear (AC)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputDigit("3");
+      engine.memoryAdd(); // memory = 123
+      assert.equal(engine.hasMemory(), true);
+
+      engine.inputDigit("9");
+      engine.clear(); // C
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.getMemoryValue(), 123);
+      assert.equal(engine.hasMemory(), true);
+
+      engine.allClear(); // AC
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.getMemoryValue(), 123);
+      assert.equal(engine.hasMemory(), true);
+    });
+
+    it("should normalize floating-point precision in memory register without IEEE-754 noise", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("0");
+      engine.inputDecimal();
+      engine.inputDigit("1");
+      engine.memoryAdd(); // memory = 0.1
+
+      engine.inputDigit("0");
+      engine.inputDecimal();
+      engine.inputDigit("2");
+      engine.memoryAdd(); // memory = 0.3 (not 0.30000000000000004)
+
+      assert.equal(engine.getMemoryValue(), 0.3);
+      assert.equal(engine.hasMemory(), true);
+    });
+
+    it("should reject memory mutations when locked in error state", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("8");
+      engine.inputOperator("/");
+      engine.inputDigit("0");
+      engine.calculate(); // Locks in "Cannot divide by zero"
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
+
+      engine.memoryAdd();
+      assert.equal(engine.getMemoryValue(), 0);
+      assert.equal(engine.hasMemory(), false);
+
+      engine.memorySubtract();
+      assert.equal(engine.getMemoryValue(), 0);
+      assert.equal(engine.hasMemory(), false);
+
+      engine.memoryRecall();
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
     });
   });
 });

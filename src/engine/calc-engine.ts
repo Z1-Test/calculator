@@ -26,6 +26,7 @@ export class CalcEngine {
   private isWaitingForOperand: boolean = false;
   private isLocked: boolean = false;
   private errorMessage: string | null = null;
+  private memory: number = 0;
 
   /**
    * Appends a numeric digit (0-9) to the active input buffer.
@@ -190,6 +191,72 @@ export class CalcEngine {
   }
 
   /**
+   * Adds the current active buffer value to the memory register.
+   * Normalizes precision to eliminate IEEE-754 representation noise.
+   * If the engine is locked by an error, input is ignored.
+   */
+  public memoryAdd(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const currentOperand = this.parseBuffer();
+    this.memory = normalizePrecision(this.memory + currentOperand);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Subtracts the current active buffer value from the memory register.
+   * Normalizes precision to eliminate IEEE-754 representation noise.
+   * If the engine is locked by an error, input is ignored.
+   */
+  public memorySubtract(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const currentOperand = this.parseBuffer();
+    this.memory = normalizePrecision(this.memory - currentOperand);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Recalls the value stored in the memory register into the active buffer.
+   * Sets isWaitingForOperand to false to enable immediate operand chaining.
+   * If the engine is locked by an error, input is ignored.
+   */
+  public memoryRecall(): void {
+    if (this.isLocked) {
+      return;
+    }
+    this.currentBuffer = String(this.memory);
+    this.isWaitingForOperand = false;
+  }
+
+  /**
+   * Resets the memory register back to 0.
+   * If the engine is locked by an error, input is ignored.
+   */
+  public memoryClear(): void {
+    if (this.isLocked) {
+      return;
+    }
+    this.memory = 0;
+  }
+
+  /**
+   * Returns true if the memory register contains a non-zero value.
+   */
+  public hasMemory(): boolean {
+    return this.memory !== 0;
+  }
+
+  /**
+   * Returns the current numeric value stored in the memory register.
+   */
+  public getMemoryValue(): number {
+    return this.memory;
+  }
+
+  /**
    * Returns the formatted string suitable for the calculator display.
    */
   public getDisplay(): string {
@@ -211,6 +278,8 @@ export class CalcEngine {
       isLocked: this.isLocked,
       errorMessage: this.errorMessage,
       display: this.getDisplay(),
+      memory: this.memory,
+      hasMemory: this.hasMemory(),
     };
   }
 

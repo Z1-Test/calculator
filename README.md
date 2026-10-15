@@ -17,6 +17,12 @@
   - **Scientific Mode**: Advanced trigonometry (`sin`, `cos`, `tan`), inverse/hyperbolic functions, logarithms (`log`, `ln`), powers (`x^y`), constants (`π`, `e`), and angle mode toggling (`DEG` / `RAD`).
   - **Programmer Mode**: Instant radix conversions (`HEX`, `DEC`, `OCT`, `BIN`), bitwise operations (`AND`, `OR`, `XOR`, `NOT`, `LSH`, `RSH`), and bit-width clamping (`BYTE`, `WORD`, `DWORD`, `QWORD`).
 - ⚡ **Zero External Runtime Dependencies**: Built directly on native browser standards (W3C Custom Elements, Declarative Shadow DOM, and modern CSS custom properties).
+- 🧠 **Memory Registers & Reactive Status Badge**:
+  - Discrete memory registers: `M+` (Add to Memory), `M-` (Subtract from Memory), `MR` (Memory Recall), and `MC` (Memory Clear).
+  - High-precision normalization preventing IEEE-754 floating-point drift.
+  - Reactive visual `M` indicator badge on display when memory holds a non-zero value.
+  - Full memory persistence across chained calculations, Clear Entry (`C`), and All Clear (`AC`).
+  - Accessible tactile keypad buttons with WCAG 2.2 AA compliant focus rings and screen reader labels.
 - 📴 **Offline-First PWA**: Cache-first Service Worker architecture allowing 100% functionality without an active internet connection.
 - 🎨 **Dynamic Theming**: Seamless Light, Dark, and System Auto-Detect themes powered by standard CSS design tokens.
 - 📜 **Persistent History Tape**: Session calculation history saved locally in `localStorage` with one-click recall to the active display.
