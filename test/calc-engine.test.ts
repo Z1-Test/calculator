@@ -1298,6 +1298,99 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(engine.calculate(), "10");
     });
   });
+
+  describe("12. Formula Expression & Parentheses Precedence (CASE-EXPR-01 to CASE-EXPR-10)", () => {
+    it("should maintain live formula expression string and parentheses depth (CASE-EXPR-01)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("2");
+      engine.inputOperator("*");
+      engine.inputParenthesis("(");
+      engine.inputDigit("3");
+      engine.inputOperator("+");
+      engine.inputDigit("4");
+
+      const state = engine.getState();
+      assert.equal(state.parenDepth, 1);
+      assert.equal(engine.getExpression(), "2 * (3 + 4");
+    });
+
+    it("should evaluate parentheses expressions with auto-closing on calculate() (CASE-EXPR-04)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("2");
+      engine.inputOperator("*");
+      engine.inputParenthesis("(");
+      engine.inputDigit("3");
+      engine.inputOperator("+");
+      engine.inputDigit("4");
+
+      assert.equal(engine.calculate(), "14");
+      assert.equal(engine.getState().parenDepth, 0);
+      assert.ok(engine.getExpression().includes("14"));
+    });
+
+    it("should evaluate multi-level nested parentheses expressions (CASE-EXPR-02)", () => {
+      const engine = new CalcEngine();
+      engine.inputParenthesis("(");
+      engine.inputParenthesis("(");
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("3");
+      engine.inputParenthesis(")");
+      engine.inputOperator("*");
+      engine.inputDigit("2");
+      engine.inputParenthesis(")");
+
+      assert.equal(engine.calculate(), "10");
+      assert.equal(engine.getState().parenDepth, 0);
+    });
+
+    it("should enforce BODMAS precedence in evaluateExpression() (CASE-EXPR-03)", () => {
+      const engine = new CalcEngine();
+      assert.equal(engine.evaluateExpression("2 + 3 * 4"), 14);
+      assert.equal(engine.evaluateExpression("(2 + 3) * 4"), 20);
+      assert.equal(engine.evaluateExpression("2 * 3 ^ 2"), 18);
+    });
+
+    it("should prevent division by zero in sub-expressions and lock engine (CASE-EXPR-07)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("/");
+      engine.inputParenthesis("(");
+      engine.inputDigit("5");
+      engine.inputOperator("-");
+      engine.inputDigit("5");
+      engine.inputParenthesis(")");
+
+      assert.equal(engine.calculate(), "Cannot divide by zero");
+      assert.equal(engine.getState().isLocked, true);
+    });
+
+    it("should ignore mismatched closing parenthesis when parenDepth is 0 (CASE-EXPR-08)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("7");
+      engine.inputParenthesis(")");
+      assert.equal(engine.getState().parenDepth, 0);
+      assert.equal(engine.getExpression(), "7");
+    });
+
+    it("should synchronize Clear Entry (C) and All Clear (AC) with expression preview (CASE-EXPR-10)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("5");
+      engine.inputOperator("+");
+      engine.inputDigit("8");
+      engine.clear();
+      assert.equal(engine.getDisplay(), "0");
+
+      engine.inputDigit("9");
+      assert.equal(engine.calculate(), "14");
+
+      engine.allClear();
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.getExpression(), "");
+      assert.equal(engine.getState().parenDepth, 0);
+    });
+  });
 });
 
 

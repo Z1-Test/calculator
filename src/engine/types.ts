@@ -75,6 +75,10 @@ export interface CalcEngineState {
   multiRadix: MultiRadixState;
   /** True if Programmer Mode is currently active */
   isProgrammerMode: boolean;
+  /** Live formula expression string (e.g. '2 * (3 + 4)') */
+  expression: string;
+  /** Current nesting depth of unclosed parentheses */
+  parenDepth: number;
 }
 
 /**
