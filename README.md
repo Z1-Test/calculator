@@ -25,7 +25,12 @@
   - Accessible tactile keypad buttons with WCAG 2.2 AA compliant focus rings and screen reader labels.
 - 📴 **Offline-First PWA**: Cache-first Service Worker architecture allowing 100% functionality without an active internet connection.
 - 🎨 **Dynamic Theming**: Seamless Light, Dark, and System Auto-Detect themes powered by standard CSS design tokens.
-- 📜 **Persistent History Tape**: Session calculation history saved locally in `localStorage` with one-click recall to the active display.
+- 📜 **Calculation History Tape & Audit Drawer**:
+  - Automatically records completed arithmetic expressions (`2 + 3 = 5`) and intermediate chained calculations into an in-memory audit tape.
+  - Bounded FIFO buffer holding up to 50 calculations preventing memory leaks (`RULE-CALC-005`).
+  - Preserved across Clear Entry (`C`) and All Clear (`AC`); explicitly cleared via `#history-clear` (`clearHistory()`).
+  - Accessible collapsible `#history-drawer` with `#history-toggle` button (`aria-expanded`, `aria-controls`).
+  - One-click or keyboard (`Enter` / `Space`) recall of prior calculation results into active buffer with mobile zero-overflow layout (320px–390px).
 - ♿ **WCAG 2.2 AA Accessible**: Full physical keyboard support (Numpad, Enter, Escape, Backspace, shortcuts), high-contrast ratios, and polite ARIA live regions for screen readers.
 
 ---
@@ -62,6 +67,7 @@ For complete mathematical domain rules, system specifications, design system tok
 - **[System Architecture](./docs/context/project/architecture.md)**: Custom Elements topology and calculation protocol.
 - **[Domain Rules & Invariants](./docs/context/project/domain-rules.md)**: `RULE-*` and `NEVER-*` mathematical safety policies.
 - **[Design System](./docs/context/project/design.md)**: Semantic token recipes, typography, and color tokens.
+- **[Calculation History Tape Specification](./docs/context/features/calculation-history-tape/feature.md)**: 3-file specification slice covering calculation history tape, interaction flows, universal test cases, and stalls.
 - **[ADR 0001](./docs/context/decisions/0001-offline-first-pwa-custom-elements.md)**: Offline-first PWA and W3C Custom Elements architectural decision record.
 
 ---
