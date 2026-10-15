@@ -1,7 +1,40 @@
 /**
- * Supported arithmetic operators for CalcEngine.
+ * Supported arithmetic and bitwise operators for CalcEngine.
  */
-export type Operator = "+" | "-" | "*" | "/" | "^";
+export type Operator =
+  | "+"
+  | "-"
+  | "*"
+  | "/"
+  | "^"
+  | "&"
+  | "|"
+  | "XOR"
+  | "NOT"
+  | "LSH"
+  | "RSH"
+  | "<<"
+  | ">>";
+
+/**
+ * Supported radix numeral bases for Programmer Mode.
+ */
+export type RadixBase = "HEX" | "DEC" | "OCT" | "BIN";
+
+/**
+ * Supported bit-width word sizes for Programmer Mode.
+ */
+export type WordSize = 8 | 16 | 32 | 64;
+
+/**
+ * Real-time formatted string representations across all 4 radix bases.
+ */
+export interface MultiRadixState {
+  hex: string;
+  dec: string;
+  oct: string;
+  bin: string;
+}
 
 /**
  * Angle measurement mode for trigonometric operations.
@@ -34,6 +67,14 @@ export interface CalcEngineState {
   history: CalculationRecord[];
   /** Active angle mode for trigonometric calculations (DEG or RAD) */
   angleMode: AngleMode;
+  /** Active radix base in Programmer Mode (HEX, DEC, OCT, BIN) */
+  radix: RadixBase;
+  /** Active word size bit width in Programmer Mode (8, 16, 32, 64) */
+  wordSize: WordSize;
+  /** Live formatted representations across all 4 radix bases */
+  multiRadix: MultiRadixState;
+  /** True if Programmer Mode is currently active */
+  isProgrammerMode: boolean;
 }
 
 /**

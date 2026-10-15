@@ -1088,5 +1088,337 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       assert.equal(calc.getScientificOpen(), false);
     });
   });
+
+  describe("12. Programmer Radix Mode UI & Keypad Gating (CASE-PROG-08 to CASE-PROG-11, RULE-PROG-001 to RULE-PROG-004)", () => {
+    it("should initialize with programmer panel closed and aria-expanded = false (CASE-PROG-08)", () => {
+      assert.equal(calc.getProgrammerOpen(), false);
+      const toggle = calc.shadowRoot!.getElementById("programmer-toggle");
+      assert.ok(toggle);
+      assert.equal(toggle.getAttribute("aria-expanded"), "false");
+      assert.equal(toggle.getAttribute("aria-controls"), "programmer-panel");
+
+      const panel = calc.shadowRoot!.getElementById("programmer-panel");
+      assert.ok(panel);
+      assert.equal(panel.classList.contains("open"), false);
+    });
+
+    it("should toggle programmer panel open and closed on #programmer-toggle button click (CASE-PROG-08, FLW-PROG-01)", () => {
+      const toggle = calc.shadowRoot!.getElementById("programmer-toggle");
+      const panel = calc.shadowRoot!.getElementById("programmer-panel");
+
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getProgrammerOpen(), true);
+      assert.equal(calc.isProgrammerPanelOpen(), true);
+      assert.equal(toggle?.getAttribute("aria-expanded"), "true");
+      assert.equal(toggle?.classList.contains("active"), true);
+      assert.equal(panel?.classList.contains("open"), true);
+
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getProgrammerOpen(), false);
+      assert.equal(calc.isProgrammerPanelOpen(), false);
+      assert.equal(toggle?.getAttribute("aria-expanded"), "false");
+      assert.equal(toggle?.classList.contains("active"), false);
+      assert.equal(panel?.classList.contains("open"), false);
+    });
+
+    it("should synchronize live multi-radix readout panel values across HEX, DEC, OCT, BIN (CASE-PROG-08, CASE-PROG-09, RULE-PROG-001)", () => {
+      calc.toggleProgrammer();
+
+      // Enter 255 in DEC
+      calc.executeAction("digit", "2");
+      calc.executeAction("digit", "5");
+      calc.executeAction("digit", "5");
+      assert.equal(calc.getDisplayValue(), "255");
+
+      const hexVal = calc.shadowRoot!.getElementById("radix-val-hex");
+      const decVal = calc.shadowRoot!.getElementById("radix-val-dec");
+      const octVal = calc.shadowRoot!.getElementById("radix-val-oct");
+      const binVal = calc.shadowRoot!.getElementById("radix-val-bin");
+
+      assert.equal(hexVal?.textContent, "FF");
+      assert.equal(decVal?.textContent, "255");
+      assert.equal(octVal?.textContent, "377");
+      assert.equal(binVal?.textContent, "11111111");
+    });
+
+    it("should switch active radix base when radix row is clicked and reformat display value (CASE-PROG-09, DEC-PROG-05)", () => {
+      calc.toggleProgrammer();
+      calc.executeAction("digit", "2");
+      calc.executeAction("digit", "5");
+      calc.executeAction("digit", "5");
+
+      const hexRow = calc.shadowRoot!.querySelector('.radix-row[data-value="HEX"]');
+      const decRow = calc.shadowRoot!.querySelector('.radix-row[data-value="DEC"]');
+
+      hexRow?.dispatchEvent(new Event("click", { bubbles: true }));
+
+      assert.equal(calc.engine.getRadix(), "HEX");
+      assert.equal(calc.getDisplayValue(), "FF");
+      assert.equal(hexRow?.classList.contains("active"), true);
+      assert.equal(hexRow?.getAttribute("aria-checked"), "true");
+      assert.equal(decRow?.classList.contains("active"), false);
+      assert.equal(decRow?.getAttribute("aria-checked"), "false");
+
+      // Switch to BIN
+      const binRow = calc.shadowRoot!.querySelector('.radix-row[data-value="BIN"]');
+      binRow?.dispatchEvent(new Event("click", { bubbles: true }));
+
+      assert.equal(calc.engine.getRadix(), "BIN");
+      assert.equal(calc.getDisplayValue(), "11111111");
+      assert.equal(binRow?.classList.contains("active"), true);
+      assert.equal(binRow?.getAttribute("aria-checked"), "true");
+    });
+
+    it("should enforce active keypad gating across radix modes (CASE-PROG-10, RULE-PROG-003)", () => {
+      calc.toggleProgrammer();
+      const hexButtons = calc.shadowRoot!.querySelectorAll(".btn-hex");
+      const keypad = calc.shadowRoot!.getElementById("keypad-grid")!;
+      const btnDecimal = keypad.querySelector('button[data-action="decimal"]') as any;
+      const btn8 = keypad.querySelector('button[data-value="8"]') as any;
+      const btn2 = keypad.querySelector('button[data-value="2"]') as any;
+      const btn1 = keypad.querySelector('button[data-value="1"]') as any;
+
+      // Decimal point is ALWAYS disabled in programmer mode
+      assert.equal(btnDecimal.disabled, true);
+
+      // In DEC (default): Hex A-F disabled, 0-9 enabled
+      for (const btn of hexButtons) {
+        assert.equal((btn as any).disabled, true);
+      }
+      assert.equal(btn8.disabled, false);
+      assert.equal(btn2.disabled, false);
+      assert.equal(btn1.disabled, false);
+
+      // Switch to HEX: Hex A-F enabled, 0-9 enabled
+      calc.setRadix("HEX");
+      for (const btn of hexButtons) {
+        assert.equal((btn as any).disabled, false);
+      }
+      assert.equal(btn8.disabled, false);
+      assert.equal(btn2.disabled, false);
+      assert.equal(btn1.disabled, false);
+
+      // Switch to OCT: Hex A-F disabled, 8-9 disabled, 0-7 enabled
+      calc.setRadix("OCT");
+      for (const btn of hexButtons) {
+        assert.equal((btn as any).disabled, true);
+      }
+      assert.equal(btn8.disabled, true);
+      assert.equal(btn2.disabled, false);
+      assert.equal(btn1.disabled, false);
+
+      // Switch to BIN: Hex A-F disabled, 2-9 disabled, 0-1 enabled
+      calc.setRadix("BIN");
+      for (const btn of hexButtons) {
+        assert.equal((btn as any).disabled, true);
+      }
+      assert.equal(btn8.disabled, true);
+      assert.equal(btn2.disabled, true);
+      assert.equal(btn1.disabled, false);
+
+      // Close programmer mode: decimal point restored, digits 0-9 enabled
+      calc.toggleProgrammer();
+      assert.equal(btnDecimal.disabled, false);
+      assert.equal(btn8.disabled, false);
+      assert.equal(btn2.disabled, false);
+      assert.equal(btn1.disabled, false);
+      for (const btn of hexButtons) {
+        assert.equal((btn as any).disabled, true);
+      }
+    });
+
+    it("should cycle word size button and clamp active buffer (CASE-PROG-06)", () => {
+      calc.toggleProgrammer();
+      const wordSizeBtn = calc.shadowRoot!.getElementById("word-size-toggle");
+      assert.ok(wordSizeBtn);
+      assert.equal(wordSizeBtn.textContent, "QWORD (64-bit)");
+
+      // Click to DWORD 32-bit
+      wordSizeBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getWordSize(), 32);
+      assert.equal(wordSizeBtn.textContent, "DWORD (32-bit)");
+
+      // Click to WORD 16-bit
+      wordSizeBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getWordSize(), 16);
+      assert.equal(wordSizeBtn.textContent, "WORD (16-bit)");
+
+      // Click to BYTE 8-bit
+      wordSizeBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getWordSize(), 8);
+      assert.equal(wordSizeBtn.textContent, "BYTE (8-bit)");
+
+      // In 8-bit mode, compute 200 + 100 -> truncates to 44 (300 & 0xFF) (CASE-PROG-06)
+      calc.executeAction("allClear");
+      calc.executeAction("digit", "2");
+      calc.executeAction("digit", "0");
+      calc.executeAction("digit", "0");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "0");
+      calc.executeAction("digit", "0");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "44");
+
+      // Click to cycle back to QWORD 64-bit
+      wordSizeBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getWordSize(), 64);
+      assert.equal(wordSizeBtn.textContent, "QWORD (64-bit)");
+    });
+
+    it("should evaluate bitwise operations via button clicks in programmer panel (CASE-PROG-03, CASE-PROG-04, CASE-PROG-05)", () => {
+      calc.toggleProgrammer();
+      const btnAnd = calc.shadowRoot!.querySelector('button[data-action="bitwiseAnd"]');
+      const btnOr = calc.shadowRoot!.querySelector('button[data-action="bitwiseOr"]');
+      const btnXor = calc.shadowRoot!.querySelector('button[data-action="bitwiseXor"]');
+      const btnNot = calc.shadowRoot!.querySelector('button[data-action="bitwiseNot"]');
+      const btnLsh = calc.shadowRoot!.querySelector('button[data-action="bitwiseLsh"]');
+      const btnRsh = calc.shadowRoot!.querySelector('button[data-action="bitwiseRsh"]');
+
+      // 12 AND 10 = 8
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "2");
+      btnAnd?.dispatchEvent(new Event("click", { bubbles: true }));
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "0");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "8");
+
+      // 12 OR 10 = 14
+      calc.executeAction("allClear");
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "2");
+      btnOr?.dispatchEvent(new Event("click", { bubbles: true }));
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "0");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "14");
+
+      // 12 XOR 10 = 6
+      calc.executeAction("allClear");
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "2");
+      btnXor?.dispatchEvent(new Event("click", { bubbles: true }));
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "0");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "6");
+
+      // Bitwise NOT in 8-bit mode: NOT 0 = 255 (unsigned in HEX/DEC 8-bit)
+      calc.executeAction("allClear");
+      calc.setWordSize(8);
+      calc.setRadix("HEX");
+      btnNot?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "FF");
+
+      // Left shift: 5 LSH 2 = 20
+      calc.executeAction("allClear");
+      calc.setWordSize(64);
+      calc.setRadix("DEC");
+      calc.executeAction("digit", "5");
+      btnLsh?.dispatchEvent(new Event("click", { bubbles: true }));
+      calc.executeAction("digit", "2");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "20");
+
+      // Right shift: 20 RSH 2 = 5
+      btnRsh?.dispatchEvent(new Event("click", { bubbles: true }));
+      calc.executeAction("digit", "2");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "5");
+    });
+
+    it("should support physical keyboard typing and gating in programmer mode (CASE-PROG-10, STL-PROG-03)", () => {
+      calc.toggleProgrammer();
+      calc.setRadix("HEX");
+
+      // Type hex digits A, B, C via keyboard
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "a" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "B" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "c" }));
+      assert.equal(calc.getDisplayValue(), "ABC");
+
+      // Typing '.' is ignored in programmer mode
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "." }));
+      assert.equal(calc.getDisplayValue(), "ABC");
+
+      // Switch to BIN mode via setRadix
+      calc.setRadix("BIN");
+      calc.executeAction("allClear");
+
+      // Type 1, 0, 1 -> 101
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "1" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "0" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "1" }));
+      assert.equal(calc.getDisplayValue(), "101");
+
+      // Invalid binary keys (2, 9, a, f) are ignored
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "2" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "9" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "a" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "f" }));
+      assert.equal(calc.getDisplayValue(), "101");
+
+      // Bitwise keyboard operators: &
+      calc.setRadix("DEC");
+      calc.executeAction("allClear");
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "1" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "2" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "&" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "1" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "0" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+      assert.equal(calc.getDisplayValue(), "8");
+
+      // Bitwise keyboard operator: ^ (XOR in programmer mode)
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "^" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "8" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+      assert.equal(calc.getDisplayValue(), "0"); // 8 ^ 8 = 0
+    });
+
+    it("should provide accessible aria-labels and tactile pill styling on all programmer buttons (CASE-PROG-08)", () => {
+      const panel = calc.shadowRoot!.getElementById("programmer-panel");
+      assert.ok(panel);
+      const buttons = panel.querySelectorAll("button");
+      assert.ok(buttons.length >= 17, `Expected at least 17 buttons in programmer panel, found ${buttons.length}`);
+
+      for (const btn of buttons) {
+        assert.ok(btn.hasAttribute("aria-label"), `Programmer button ${btn.textContent} missing aria-label`);
+        assert.ok(btn.getAttribute("aria-label")!.length > 0);
+      }
+    });
+
+    it("should enforce mobile zero-overflow styling across 320px-390px viewports (CASE-PROG-11, RULE-PROG-004)", () => {
+      const styleEl = calc.shadowRoot!.querySelector("style");
+      assert.ok(styleEl);
+      const css = styleEl.textContent;
+
+      assert.ok(css.includes(".programmer-panel"));
+      assert.ok(css.includes(".radix-panel"));
+      assert.ok(css.includes(".radix-row"));
+      assert.ok(css.includes(".bitwise-grid"));
+      assert.ok(css.includes(".hex-keypad-grid"));
+      assert.ok(css.includes("repeat(6, 1fr)"));
+      assert.ok(css.includes("overflow-x: hidden"));
+      assert.ok(css.includes("box-sizing: border-box"));
+      assert.ok(css.includes("word-break: break-all"));
+      assert.ok(!css.includes("!important"), "Strictly zero !important across stylesheets");
+    });
+
+    it("should preserve calculation history and buffer across programmer mode toggle (NEVER-CALC-002)", () => {
+      calc.executeAction("digit", "4");
+      calc.executeAction("digit", "2");
+      assert.equal(calc.getDisplayValue(), "42");
+
+      calc.toggleProgrammer();
+      assert.equal(calc.getDisplayValue(), "42");
+      assert.equal(calc.getProgrammerOpen(), true);
+
+      calc.toggleProgrammer();
+      assert.equal(calc.getDisplayValue(), "42");
+      assert.equal(calc.getProgrammerOpen(), false);
+    });
+  });
 });
 
