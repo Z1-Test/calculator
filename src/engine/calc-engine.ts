@@ -44,6 +44,8 @@ export class CalcEngine {
   private wordSize: WordSize = 64;
   private isProgrammerMode: boolean = false;
   private programmerAccumulator: bigint | null = null;
+  private expression: string = "";
+  private parenDepth: number = 0;
 
   /**
    * Appends a numeric or hexadecimal digit to the active input buffer.
@@ -884,6 +886,8 @@ export class CalcEngine {
       wordSize: this.wordSize,
       multiRadix: this.getMultiRadixState(),
       isProgrammerMode: this.isProgrammerMode,
+      expression: this.expression,
+      parenDepth: this.parenDepth,
     };
   }
 
