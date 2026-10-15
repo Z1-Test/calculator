@@ -27,6 +27,8 @@ export class CalcEngine {
   private isLocked: boolean = false;
   private errorMessage: string | null = null;
   private memory: number = 0;
+  private static readonly MAX_HISTORY: number = 50;
+  private history: CalculationRecord[] = [];
 
   /**
    * Appends a numeric digit (0-9) to the active input buffer.
@@ -123,9 +125,19 @@ export class CalcEngine {
         return;
       }
 
-      const result = this.executeMath(this.accumulator, this.pendingOperator, currentOperand);
+      const op1 = this.accumulator;
+      const op = this.pendingOperator;
+      const result = this.executeMath(op1, op, currentOperand);
       this.accumulator = result;
       this.currentBuffer = String(result);
+      this.pushHistory({
+        operand1: op1,
+        operator: op,
+        operand2: currentOperand,
+        result,
+        timestamp: Date.now(),
+        expression: `${op1} ${op} ${currentOperand} = ${result}`,
+      });
     } else {
       this.accumulator = currentOperand;
     }
@@ -154,11 +166,21 @@ export class CalcEngine {
       return "Cannot divide by zero";
     }
 
-    const result = this.executeMath(this.accumulator, this.pendingOperator, currentOperand);
+    const op1 = this.accumulator;
+    const op = this.pendingOperator;
+    const result = this.executeMath(op1, op, currentOperand);
     this.accumulator = result;
     this.currentBuffer = String(result);
     this.pendingOperator = null;
     this.isWaitingForOperand = true;
+    this.pushHistory({
+      operand1: op1,
+      operator: op,
+      operand2: currentOperand,
+      result,
+      timestamp: Date.now(),
+      expression: `${op1} ${op} ${currentOperand} = ${result}`,
+    });
 
     return this.currentBuffer;
   }
@@ -267,6 +289,45 @@ export class CalcEngine {
   }
 
   /**
+   * Returns a copy of the calculation history buffer.
+   */
+  public getHistory(): CalculationRecord[] {
+    return [...this.history];
+  }
+
+  /**
+   * Recalls the calculation result from history at the specified index
+   * into the active input buffer.
+   * Returns null if index is invalid or engine is locked.
+   */
+  public recallHistory(index: number): CalculationRecord | null {
+    if (this.isLocked || !Number.isInteger(index) || index < 0 || index >= this.history.length) {
+      return null;
+    }
+    const entry = this.history[index];
+    this.currentBuffer = String(entry.result);
+    this.isWaitingForOperand = false;
+    return entry;
+  }
+
+  /**
+   * Clears all calculation history entries.
+   */
+  public clearHistory(): void {
+    this.history = [];
+  }
+
+  /**
+   * Appends a calculation record to the bounded FIFO history tape (max 50 entries).
+   */
+  private pushHistory(record: CalculationRecord): void {
+    this.history.push(record);
+    if (this.history.length > CalcEngine.MAX_HISTORY) {
+      this.history.shift();
+    }
+  }
+
+  /**
    * Returns a snapshot of the current engine register state.
    */
   public getState(): CalcEngineState {
@@ -280,6 +341,7 @@ export class CalcEngine {
       display: this.getDisplay(),
       memory: this.memory,
       hasMemory: this.hasMemory(),
+      history: this.getHistory(),
     };
   }
 

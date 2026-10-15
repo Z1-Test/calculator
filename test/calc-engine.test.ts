@@ -501,4 +501,169 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(engine.getDisplay(), "Cannot divide by zero");
     });
   });
+
+  describe("9. Calculation History Tape & Recall (CASE-HIST-01 to CASE-HIST-08)", () => {
+    it("should record completed calculations into history buffer upon calculate() (CASE-HIST-01)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("3");
+      const result = engine.calculate();
+      assert.equal(result, "5");
+
+      const history = engine.getHistory();
+      assert.equal(history.length, 1);
+      assert.equal(history[0].operand1, 2);
+      assert.equal(history[0].operator, "+");
+      assert.equal(history[0].operand2, 3);
+      assert.equal(history[0].result, 5);
+      assert.equal(history[0].expression, "2 + 3 = 5");
+      assert.ok(history[0].timestamp > 0);
+    });
+
+    it("should record intermediate calculations into history on chained operator inputs (CASE-HIST-02)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("+");
+      engine.inputDigit("5");
+      engine.inputOperator("*"); // records 10 + 5 = 15
+      assert.equal(engine.getHistory().length, 1);
+      assert.equal(engine.getHistory()[0].expression, "10 + 5 = 15");
+
+      engine.inputDigit("2");
+      engine.calculate(); // records 15 * 2 = 30
+      const history = engine.getHistory();
+      assert.equal(history.length, 2);
+      assert.equal(history[1].expression, "15 * 2 = 30");
+      assert.equal(history[1].result, 30);
+    });
+
+    it("should reject error calculations from history tape on division by zero (CASE-HIST-03, NEVER-CALC-007)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("8");
+      engine.inputOperator("/");
+      engine.inputDigit("0");
+      const result = engine.calculate();
+      assert.equal(result, "Cannot divide by zero");
+      assert.equal(engine.getHistory().length, 0);
+
+      // Chained division by zero
+      const chainedEngine = new CalcEngine();
+      chainedEngine.inputDigit("4");
+      chainedEngine.inputOperator("+");
+      chainedEngine.inputDigit("6");
+      chainedEngine.inputOperator("/"); // records 4 + 6 = 10
+      assert.equal(chainedEngine.getHistory().length, 1);
+
+      chainedEngine.inputDigit("0");
+      chainedEngine.inputOperator("*"); // triggers division by zero
+      assert.equal(chainedEngine.getDisplay(), "Cannot divide by zero");
+      assert.equal(chainedEngine.getHistory().length, 1); // 10 / 0 was rejected
+    });
+
+    it("should enforce bounded capacity of 50 entries with FIFO eviction (CASE-HIST-04, RULE-CALC-005)", () => {
+      const engine = new CalcEngine();
+      for (let i = 1; i <= 55; i++) {
+        engine.inputDigit(String(i % 10));
+        engine.inputOperator("+");
+        engine.inputDigit("1");
+        engine.calculate();
+      }
+
+      const history = engine.getHistory();
+      assert.equal(history.length, 50);
+      // Entry 51 pushed; entries 1..5 shifted out; entry 6 is now first
+      assert.ok(history[0].timestamp <= history[49].timestamp);
+    });
+
+    it("should recall calculation result into active buffer and allow chained operations (CASE-HIST-05)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("1");
+      engine.inputDigit("3");
+      engine.calculate(); // 12 + 13 = 25
+
+      engine.clear();
+      assert.equal(engine.getDisplay(), "0");
+
+      const recalled = engine.recallHistory(0);
+      assert.ok(recalled !== null);
+      assert.equal(recalled.result, 25);
+      assert.equal(engine.getDisplay(), "25");
+
+      // Chained calculation with recalled result
+      engine.inputOperator("+");
+      engine.inputDigit("5");
+      assert.equal(engine.calculate(), "30");
+    });
+
+    it("should safely handle out-of-bounds or invalid history indices without modifying buffer (CASE-HIST-06, REC-HIST-01)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("7");
+
+      assert.equal(engine.recallHistory(-1), null);
+      assert.equal(engine.recallHistory(99), null);
+      assert.equal(engine.recallHistory(Number.NaN), null);
+      assert.equal(engine.recallHistory(1.5), null);
+      assert.equal(engine.getDisplay(), "7");
+    });
+
+    it("should preserve history tape across Clear Entry (C) and All Clear (AC) (CASE-HIST-07, NEVER-CALC-008)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("5");
+      engine.inputOperator("+");
+      engine.inputDigit("5");
+      engine.calculate(); // 10
+
+      engine.inputDigit("4");
+      engine.clear(); // C
+      assert.equal(engine.getHistory().length, 1);
+      assert.equal(engine.getDisplay(), "0");
+
+      engine.allClear(); // AC
+      assert.equal(engine.getHistory().length, 1);
+      assert.equal(engine.getDisplay(), "0");
+      assert.equal(engine.getHistory()[0].expression, "5 + 5 = 10");
+    });
+
+    it("should completely clear history tape with clearHistory() (CASE-HIST-08)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("9");
+      engine.inputOperator("*");
+      engine.inputDigit("9");
+      engine.calculate();
+      assert.equal(engine.getHistory().length, 1);
+
+      engine.clearHistory();
+      assert.equal(engine.getHistory().length, 0);
+      assert.equal(engine.getState().history.length, 0);
+    });
+
+    it("should reject recallHistory when engine is locked in error state (STL-HIST-09)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("4");
+      engine.inputOperator("+");
+      engine.inputDigit("4");
+      engine.calculate(); // 8
+
+      engine.inputDigit("1");
+      engine.inputOperator("/");
+      engine.inputDigit("0");
+      engine.calculate(); // locked
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
+
+      assert.equal(engine.recallHistory(0), null);
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
+    });
+
+    it("should not record history when calculate is invoked without a pending operator (STL-HIST-06)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("7");
+      assert.equal(engine.calculate(), "7");
+      assert.equal(engine.getHistory().length, 0);
+    });
+  });
 });
