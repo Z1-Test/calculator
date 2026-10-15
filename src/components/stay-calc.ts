@@ -399,10 +399,8 @@ export class StayCalc extends HTMLElementBase {
 
     // Attach click listener on history drawer (delegated for recall and clear)
     const historyDrawer = this.shadowRoot?.getElementById("history-drawer");
-    const historyList = this.shadowRoot?.getElementById("history-list");
-    const historyClear = this.shadowRoot?.getElementById("history-clear");
 
-    if (historyDrawer || historyList) {
+    if (historyDrawer) {
       this.historyClickListener = (event: Event) => {
         const target = (event.target as HTMLElement)?.closest?.("button");
         if (!target) return;
@@ -410,9 +408,7 @@ export class StayCalc extends HTMLElementBase {
         const value = target.getAttribute("data-value") ?? target.getAttribute("data-index");
         this.executeAction(action, value);
       };
-      historyDrawer?.addEventListener("click", this.historyClickListener);
-      historyList?.addEventListener("click", this.historyClickListener);
-      historyClear?.addEventListener("click", this.historyClickListener);
+      historyDrawer.addEventListener("click", this.historyClickListener);
     }
 
     // Attach click listener on history toggle button
@@ -424,9 +420,8 @@ export class StayCalc extends HTMLElementBase {
       historyToggle.addEventListener("click", this.historyToggleListener);
     }
 
-    // Attach keydown listener on history drawer and list for Enter/Space recall
-    const drawer = this.shadowRoot?.getElementById("history-drawer");
-    if (drawer || historyList) {
+    // Attach keydown listener on history drawer for Enter/Space recall
+    if (historyDrawer) {
       this.historyKeydownListener = (event: KeyboardEvent) => {
         const target = (event.target as HTMLElement)?.closest?.("button");
         if (
@@ -435,12 +430,12 @@ export class StayCalc extends HTMLElementBase {
           (event.key === "Enter" || event.key === " ")
         ) {
           event.preventDefault?.();
+          event.stopPropagation?.();
           const index = target.getAttribute("data-index");
           this.executeAction("recallHistory", index);
         }
       };
-      drawer?.addEventListener("keydown", this.historyKeydownListener);
-      historyList?.addEventListener("keydown", this.historyKeydownListener);
+      historyDrawer.addEventListener("keydown", this.historyKeydownListener);
     }
 
     // Attach global window keyboard listener
@@ -470,10 +465,6 @@ export class StayCalc extends HTMLElementBase {
     if (this.historyClickListener && this.shadowRoot) {
       const historyDrawer = this.shadowRoot.getElementById("history-drawer");
       historyDrawer?.removeEventListener("click", this.historyClickListener);
-      const historyList = this.shadowRoot.getElementById("history-list");
-      historyList?.removeEventListener("click", this.historyClickListener);
-      const historyClear = this.shadowRoot.getElementById("history-clear");
-      historyClear?.removeEventListener("click", this.historyClickListener);
       this.historyClickListener = null;
     }
 
@@ -484,10 +475,8 @@ export class StayCalc extends HTMLElementBase {
     }
 
     if (this.historyKeydownListener && this.shadowRoot) {
-      const drawer = this.shadowRoot.getElementById("history-drawer");
-      drawer?.removeEventListener("keydown", this.historyKeydownListener);
-      const historyList = this.shadowRoot.getElementById("history-list");
-      historyList?.removeEventListener("keydown", this.historyKeydownListener);
+      const historyDrawer = this.shadowRoot.getElementById("history-drawer");
+      historyDrawer?.removeEventListener("keydown", this.historyKeydownListener);
       this.historyKeydownListener = null;
     }
 
@@ -591,6 +580,10 @@ export class StayCalc extends HTMLElementBase {
    * Handles keyboard navigation and key mapping for physical keyboard typing.
    */
   public handleKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) {
+      return;
+    }
+
     // Preserve browser shortcuts (e.g. Ctrl+C, Cmd+R) per RULE-UI-004 & DEC-UI-01
     if (event.ctrlKey || event.metaKey || event.altKey) {
       return;

@@ -306,7 +306,10 @@ export class CalcEngine {
     }
     const entry = this.history[index];
     this.currentBuffer = String(entry.result);
-    this.isWaitingForOperand = false;
+    // In idle state without pending operator, set isWaitingForOperand to true so subsequent
+    // digit input starts a fresh operand rather than appending to recalled result.
+    // When an operator is pending, set to false so the recalled value acts as the second operand.
+    this.isWaitingForOperand = this.pendingOperator === null;
     return entry;
   }
 

@@ -600,6 +600,42 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(engine.calculate(), "30");
     });
 
+    it("should start fresh operand when typing digit after recallHistory in idle state", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("1");
+      engine.inputDigit("3");
+      engine.calculate(); // 12 + 13 = 25
+
+      engine.clear();
+      engine.recallHistory(0);
+      assert.equal(engine.getDisplay(), "25");
+
+      // Typing a digit in idle state starts a fresh operand rather than appending
+      engine.inputDigit("3");
+      assert.equal(engine.getDisplay(), "3");
+    });
+
+    it("should allow recallHistory as second operand during active pending operation", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("1");
+      engine.inputDigit("3");
+      engine.calculate(); // 12 + 13 = 25
+
+      engine.allClear();
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("+"); // pendingOperator is "+"
+      engine.recallHistory(0);
+      assert.equal(engine.getDisplay(), "25");
+      assert.equal(engine.calculate(), "35");
+    });
+
     it("should safely handle out-of-bounds or invalid history indices without modifying buffer (CASE-HIST-06, REC-HIST-01)", () => {
       const engine = new CalcEngine();
       engine.inputDigit("7");

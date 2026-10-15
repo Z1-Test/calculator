@@ -877,6 +877,43 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       assert.equal(historyEmpty?.style.display, "block");
     });
 
+    it("should dispatch history actions exactly once without duplicate bubbling dispatches", () => {
+      calc.executeAction("digit", "5");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "5");
+      calc.executeAction("calculate"); // 10
+
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const itemBtn = historyList?.childNodes[0] as MockElement;
+      assert.ok(itemBtn);
+
+      const historyCalls: string[] = [];
+      const originalExecuteAction = calc.executeAction.bind(calc);
+      calc.executeAction = (action, val) => {
+        historyCalls.push(`${action}:${val}`);
+        return originalExecuteAction(action, val);
+      };
+
+      // Item click must fire once
+      itemBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "recallHistory:0");
+
+      historyCalls.length = 0;
+      // Item keydown Enter must fire once
+      const enterEvent = new MockKeyboardEvent("keydown", { key: "Enter", bubbles: true });
+      itemBtn.dispatchEvent(enterEvent);
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "recallHistory:0");
+
+      historyCalls.length = 0;
+      // Clear history click must fire once
+      const clearBtn = calc.shadowRoot!.getElementById("history-clear");
+      clearBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "clearHistory:null");
+    });
+
     it("should preserve history across Clear Entry (C) and All Clear (AC) button clicks", () => {
       calc.executeAction("digit", "6");
       calc.executeAction("operator", "+");
