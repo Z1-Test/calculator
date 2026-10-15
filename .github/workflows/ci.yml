@@ -24,7 +24,7 @@ jobs:
           if node -e 'const pkg=require("./package.json"); process.exit(pkg.devDependencies && Object.keys(pkg.devDependencies).length > 0 ? 0 : 1)'; then
             npm install
           else
-            console.log("Zero dependencies present, skipping npm install.")
+            echo "Zero dependencies present, skipping npm install."
           fi
 
       - name: Run test suite
