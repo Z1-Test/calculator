@@ -73,6 +73,26 @@ export class CalcEngine {
   }
 
   /**
+   * Removes the last entered character from the active buffer.
+   * If the buffer only contains a single character or is waiting for an operand,
+   * resets the buffer back to "0".
+   */
+  public backspace(): void {
+    if (this.isLocked || this.isWaitingForOperand) {
+      return;
+    }
+
+    if (this.currentBuffer.length > 1) {
+      this.currentBuffer = this.currentBuffer.slice(0, -1);
+      if (this.currentBuffer === "-" || this.currentBuffer === "") {
+        this.currentBuffer = "0";
+      }
+    } else {
+      this.currentBuffer = "0";
+    }
+  }
+
+  /**
    * Ingests an arithmetic operator (+, -, *, /).
    *
    * In immediate execution mode:
