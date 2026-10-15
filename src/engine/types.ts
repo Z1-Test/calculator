@@ -21,6 +21,10 @@ export interface CalcEngineState {
   errorMessage: string | null;
   /** Formatted string ready for display rendering */
   display: string;
+  /** Stored value in the memory register */
+  memory: number;
+  /** True if memory register contains a non-zero value */
+  hasMemory: boolean;
 }
 
 /**
