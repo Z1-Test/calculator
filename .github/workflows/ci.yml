@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install devDependencies if present
+        run: |
+          if node -e 'const pkg=require("./package.json"); process.exit(pkg.devDependencies && Object.keys(pkg.devDependencies).length > 0 ? 0 : 1)'; then
+            npm install
+          else
+            console.log("Zero dependencies present, skipping npm install.")
+          fi
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Verify zero runtime dependencies
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("./package.json", "utf8"));
+            const deps = pkg.dependencies || {};
+            if (Object.keys(deps).length > 0) {
+              console.error("FATAL: External runtime dependencies found in package.json:", deps);
+              process.exit(1);
+            }
+            console.log("PASS: Zero runtime dependencies verified.");
+          '
