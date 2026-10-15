@@ -25,6 +25,9 @@ sources:
 - **`RULE-PROG-004` (Programmer UI Zero Horizontal Overflow)**: `#programmer-panel`, `#radix-panel`, and hex keypad grids must maintain `scrollWidth <= clientWidth` on 320px–390px mobile viewports.
 - **`RULE-CALC-005` (History Tape Cap)**: The local history tape must retain a maximum of 50 entries. When the limit is reached, the oldest entries must be automatically pruned (FIFO).
 - **`RULE-CALC-006` (Memory Register Persistence)**: Memory register values must persist across mode switches (e.g., switching between Standard and Scientific) within the same session.
+- **`RULE-EXP-001` (Deterministic Tape Export)**: CSV and TXT exports must generate deterministic byte-clean strings conforming to RFC 4180 without external parsing libraries.
+- **`RULE-CLIP-001` (Safe Clipboard Synchronization)**: Clipboard operations must safely catch permission rejections and fallback cleanly without unhandled exceptions.
+- **`RULE-TOAST-001` (Polite Live Region Feedback)**: Status feedback must use `aria-live="polite"` and auto-dismiss without moving keyboard focus.
 
 ## 2. Security & Execution Invariants
 
