@@ -988,5 +988,316 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
       assert.equal(engine.calculate(), "27");
     });
   });
+
+  describe("11. Programmer Radix Mode & Bitwise Operations (CASE-PROG-01 to CASE-PROG-07, CASE-PROG-09, CASE-PROG-10)", () => {
+    it("should initialize in DEC mode, 64-bit word size, and return initial multiRadixState (CASE-PROG-02)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      assert.equal(engine.isProgrammerModeActive(), true);
+      assert.equal(engine.getRadix(), "DEC");
+      assert.equal(engine.getWordSize(), 64);
+
+      const state = engine.getMultiRadixState();
+      assert.deepEqual(state, {
+        hex: "0",
+        dec: "0",
+        oct: "0",
+        bin: "0",
+      });
+    });
+
+    it("should format multiRadix representations for positive values (CASE-PROG-01)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // Input 255 in DEC
+      engine.inputDigit("2");
+      engine.inputDigit("5");
+      engine.inputDigit("5");
+      assert.equal(engine.getDisplay(), "255");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.hex, "FF");
+      assert.equal(state.dec, "255");
+      assert.equal(state.oct, "377");
+      assert.equal(state.bin, "11111111");
+    });
+
+    it("should format signed vs unsigned representations for negative values across word sizes (CASE-PROG-07)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.setWordSize(8);
+
+      // 0 - 1 = -1 in 8-bit
+      engine.inputDigit("0");
+      engine.inputOperator("-");
+      engine.inputDigit("1");
+      const res = engine.calculate();
+      assert.equal(res, "-1");
+
+      const state8 = engine.getMultiRadixState();
+      assert.equal(state8.hex, "FF");
+      assert.equal(state8.dec, "-1");
+      assert.equal(state8.oct, "377");
+      assert.equal(state8.bin, "11111111");
+
+      // Switch to 16-bit
+      engine.setWordSize(16);
+      engine.clear();
+      engine.inputDigit("0");
+      engine.inputOperator("-");
+      engine.inputDigit("1");
+      engine.calculate();
+
+      const state16 = engine.getMultiRadixState();
+      assert.equal(state16.hex, "FFFF");
+      assert.equal(state16.dec, "-1");
+      assert.equal(state16.oct, "177777");
+      assert.equal(state16.bin, "1111111111111111");
+    });
+
+    it("should evaluate bitwise AND (&) operations (CASE-PROG-03)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // 12 & 10 = 8 (1100 & 1010 = 1000)
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("&");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      const result = engine.calculate();
+      assert.equal(result, "8");
+      assert.equal(engine.getDisplay(), "8");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.bin, "1000");
+      assert.equal(state.hex, "8");
+    });
+
+    it("should evaluate bitwise OR (|) operations (CASE-PROG-03)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // 12 | 10 = 14 (1100 | 1010 = 1110)
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("|");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      const result = engine.calculate();
+      assert.equal(result, "14");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.bin, "1110");
+      assert.equal(state.hex, "E");
+    });
+
+    it("should evaluate bitwise XOR (^) operations (CASE-PROG-04)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // 12 ^ 10 = 6 (1100 ^ 1010 = 0110)
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("^");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      const result = engine.calculate();
+      assert.equal(result, "6");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.bin, "110");
+      assert.equal(state.hex, "6");
+    });
+
+    it("should evaluate bitwise unary NOT (~) within word size (CASE-PROG-04)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.setWordSize(8);
+
+      // ~0 in 8-bit mode is 0xFF (-1 signed)
+      engine.inputDigit("0");
+      engine.bitwiseNot();
+      assert.equal(engine.getDisplay(), "-1");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.hex, "FF");
+      assert.equal(state.bin, "11111111");
+      assert.equal(state.oct, "377");
+      assert.equal(state.dec, "-1");
+    });
+
+    it("should evaluate bitwise left shift (<< / LSH) and right shift (>> / RSH) (CASE-PROG-05)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+
+      // 5 << 2 = 20
+      engine.inputDigit("5");
+      engine.inputOperator("<<");
+      engine.inputDigit("2");
+      assert.equal(engine.calculate(), "20");
+
+      // 20 >> 2 = 5
+      engine.clear();
+      engine.inputDigit("2");
+      engine.inputDigit("0");
+      engine.inputOperator(">>");
+      engine.inputDigit("2");
+      assert.equal(engine.calculate(), "5");
+    });
+
+    it("should clamp shift operand to valid range [0, wordSize - 1] (STL-PROG-02)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.setWordSize(8);
+
+      // 1 << 10 should clamp to 1 << 7 in 8-bit = 128 (0x80)
+      engine.inputDigit("1");
+      engine.inputOperator("LSH");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.calculate();
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.hex, "80");
+      assert.equal(state.bin, "10000000");
+    });
+
+    it("should enforce word size clamping and overflow truncation across 8, 16, 32, and 64-bit modes (CASE-PROG-06)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.setWordSize(8);
+
+      // 200 + 100 = 300; in 8-bit unsigned: 300 % 256 = 44
+      engine.inputDigit("2");
+      engine.inputDigit("0");
+      engine.inputDigit("0");
+      engine.inputOperator("+");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputDigit("0");
+      const result = engine.calculate();
+      assert.equal(result, "44");
+
+      const state = engine.getMultiRadixState();
+      assert.equal(state.dec, "44");
+      assert.equal(state.hex, "2C");
+      assert.equal(state.bin, "101100");
+    });
+
+    it("should preserve active buffer value across radix base switches mid-entry (CASE-PROG-09, NEVER-CALC-002)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.inputDigit("2");
+      engine.inputDigit("5");
+      engine.inputDigit("5");
+      assert.equal(engine.getDisplay(), "255");
+
+      // Switch to HEX -> display "FF"
+      engine.setRadix("HEX");
+      assert.equal(engine.getDisplay(), "FF");
+      assert.equal(engine.getRadix(), "HEX");
+
+      // Switch to BIN -> display "11111111"
+      engine.setRadix("BIN");
+      assert.equal(engine.getDisplay(), "11111111");
+
+      // Switch to OCT -> display "377"
+      engine.setRadix("OCT");
+      assert.equal(engine.getDisplay(), "377");
+
+      // Switch back to DEC -> display "255"
+      engine.setRadix("DEC");
+      assert.equal(engine.getDisplay(), "255");
+    });
+
+    it("should enforce active radix keypad gating and ignore invalid characters (CASE-PROG-10, RULE-PROG-003)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+
+      // 1. In BIN mode, only 0 and 1 are accepted
+      engine.setRadix("BIN");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputDigit("2"); // Ignored
+      engine.inputDigit("9"); // Ignored
+      engine.inputDigit("A"); // Ignored
+      engine.inputDecimal(); // Ignored per RULE-PROG-003
+      assert.equal(engine.getDisplay(), "10");
+
+      // 2. In OCT mode, only 0-7 are accepted
+      engine.clear();
+      engine.setRadix("OCT");
+      engine.inputDigit("7");
+      engine.inputDigit("5");
+      engine.inputDigit("8"); // Ignored
+      engine.inputDigit("9"); // Ignored
+      engine.inputDigit("F"); // Ignored
+      assert.equal(engine.getDisplay(), "75");
+
+      // 3. In HEX mode, 0-9 and A-F are accepted
+      engine.clear();
+      engine.setRadix("HEX");
+      engine.inputDigit("A");
+      engine.inputDigit("b"); // Converted to 'B'
+      engine.inputDigit("F");
+      engine.inputDigit("3");
+      engine.inputDigit("G"); // Ignored
+      assert.equal(engine.getDisplay(), "ABF3");
+
+      // 4. In DEC mode, 0-9 accepted, A-F ignored
+      engine.clear();
+      engine.setRadix("DEC");
+      engine.inputDigit("9");
+      engine.inputDigit("8");
+      engine.inputDigit("C"); // Ignored
+      assert.equal(engine.getDisplay(), "98");
+    });
+
+    it("should handle integer division by zero and lock engine (STL-PROG-01, NEVER-CALC-003)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      engine.inputDigit("1");
+      engine.inputDigit("5");
+      engine.inputOperator("/");
+      engine.inputDigit("0");
+      assert.equal(engine.calculate(), "Cannot divide by zero");
+      assert.equal(engine.getState().isLocked, true);
+
+      // Locked engine ignores further input until unlocked
+      engine.inputDigit("5");
+      assert.equal(engine.getDisplay(), "Cannot divide by zero");
+
+      engine.clear();
+      assert.equal(engine.getState().isLocked, false);
+      assert.equal(engine.getDisplay(), "0");
+    });
+
+    it("should support chained bitwise operations with intermediate evaluation", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // 12 & 10 = 8; 8 | 1 = 9
+      engine.inputDigit("1");
+      engine.inputDigit("2");
+      engine.inputOperator("&");
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("|"); // Immediate evaluation: 12 & 10 = 8
+      assert.equal(engine.getDisplay(), "8");
+
+      engine.inputDigit("1");
+      assert.equal(engine.calculate(), "9");
+    });
+
+    it("should replace consecutive bitwise operators (e.g. 10 & | 2 = 10 | 2 = 10)", () => {
+      const engine = new CalcEngine();
+      engine.setProgrammerMode(true);
+      // 10 & | 2 = 10 | 2 = 10
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("&");
+      engine.inputOperator("|"); // Replaces & with |
+      engine.inputDigit("2");
+      assert.equal(engine.calculate(), "10");
+    });
+  });
 });
+
 

@@ -1,4 +1,12 @@
-import type { AngleMode, CalcEngineState, CalculationRecord, Operator } from "./types.ts";
+import type {
+  AngleMode,
+  CalcEngineState,
+  CalculationRecord,
+  MultiRadixState,
+  Operator,
+  RadixBase,
+  WordSize,
+} from "./types.ts";
 
 /**
  * Truncates and normalizes IEEE-754 binary floating-point representation noise
@@ -17,6 +25,8 @@ export function normalizePrecision(val: number): number {
  * Implements immediate left-to-right pocket calculator execution,
  * decimal precision normalization eliminating IEEE-754 float bugs (0.1 + 0.2 = 0.3),
  * division-by-zero error locking, consecutive operator replacement,
+ * multi-radix integer representation (HEX, DEC, OCT, BIN), bitwise operations,
+ * selectable word sizes (8, 16, 32, 64-bit), active keypad gating,
  * and Clear (C) vs All Clear (AC) register reset semantics.
  */
 export class CalcEngine {
@@ -30,13 +40,60 @@ export class CalcEngine {
   private static readonly MAX_HISTORY: number = 50;
   private history: CalculationRecord[] = [];
   private angleMode: AngleMode = "DEG";
+  private radix: RadixBase = "DEC";
+  private wordSize: WordSize = 64;
+  private isProgrammerMode: boolean = false;
+  private programmerAccumulator: bigint | null = null;
 
   /**
-   * Appends a numeric digit (0-9) to the active input buffer.
-   * If the engine is locked by an arithmetic error, input is rejected.
+   * Appends a numeric or hexadecimal digit to the active input buffer.
+   * If the engine is locked by an arithmetic error or the character is invalid
+   * for the active radix base, input is rejected per RULE-PROG-003.
    */
   public inputDigit(digit: string): void {
     if (this.isLocked) {
+      return;
+    }
+
+    if (this.isProgrammerMode) {
+      const normalized = digit.toUpperCase();
+      let isValid = false;
+      let maxLen = 20;
+
+      switch (this.radix) {
+        case "HEX":
+          isValid = /^[0-9A-F]$/.test(normalized);
+          maxLen = 16;
+          break;
+        case "OCT":
+          isValid = /^[0-7]$/.test(normalized);
+          maxLen = 22;
+          break;
+        case "BIN":
+          isValid = /^[01]$/.test(normalized);
+          maxLen = 64;
+          break;
+        case "DEC":
+        default:
+          isValid = /^[0-9]$/.test(normalized);
+          maxLen = 20;
+          break;
+      }
+
+      if (!isValid) {
+        return;
+      }
+
+      if (this.isWaitingForOperand) {
+        this.currentBuffer = normalized;
+        this.isWaitingForOperand = false;
+      } else {
+        if (this.currentBuffer === "0") {
+          this.currentBuffer = normalized;
+        } else if (this.currentBuffer.length < maxLen) {
+          this.currentBuffer += normalized;
+        }
+      }
       return;
     }
 
@@ -62,9 +119,10 @@ export class CalcEngine {
   /**
    * Appends a decimal point to the active buffer.
    * Ignores redundant decimal points if one already exists in the buffer.
+   * Disabled in Programmer Mode per RULE-PROG-003.
    */
   public inputDecimal(): void {
-    if (this.isLocked) {
+    if (this.isLocked || this.isProgrammerMode) {
       return;
     }
 
@@ -97,7 +155,7 @@ export class CalcEngine {
   }
 
   /**
-   * Ingests an arithmetic operator (+, -, *, /).
+   * Ingests an arithmetic or bitwise operator.
    *
    * In immediate execution mode:
    * - If an operator was already entered and no new digits followed,
@@ -112,6 +170,49 @@ export class CalcEngine {
     // Consecutive operator replacement
     if (this.pendingOperator !== null && this.isWaitingForOperand) {
       this.pendingOperator = operator;
+      return;
+    }
+
+    const isBitwiseOp =
+      operator === "&" ||
+      operator === "|" ||
+      operator === "XOR" ||
+      operator === "LSH" ||
+      operator === "RSH" ||
+      operator === "<<" ||
+      operator === ">>";
+
+    if (this.isProgrammerMode || isBitwiseOp) {
+      const currentOperand = this.parseBufferBigInt();
+      if (this.programmerAccumulator === null) {
+        this.programmerAccumulator = currentOperand;
+        this.accumulator = Number(BigInt.asIntN(53, currentOperand));
+      } else if (this.pendingOperator !== null) {
+        if (this.pendingOperator === "/" && currentOperand === 0n) {
+          this.setDivisionByZeroError();
+          return;
+        }
+        const op1 = this.programmerAccumulator;
+        const op = this.pendingOperator;
+        const result = this.executeProgrammerMath(op1, op, currentOperand);
+        this.programmerAccumulator = result;
+        this.accumulator = Number(BigInt.asIntN(53, result));
+        this.currentBuffer = this.formatValueForRadix(result, this.radix);
+        this.pushHistory({
+          operand1: Number(BigInt.asIntN(53, op1)),
+          operator: op,
+          operand2: Number(BigInt.asIntN(53, currentOperand)),
+          result: Number(BigInt.asIntN(53, result)),
+          timestamp: Date.now(),
+          expression: `${this.formatValueForRadix(op1, this.radix)} ${op} ${this.formatValueForRadix(currentOperand, this.radix)} = ${this.currentBuffer}`,
+        });
+      } else {
+        this.programmerAccumulator = currentOperand;
+        this.accumulator = Number(BigInt.asIntN(53, currentOperand));
+      }
+
+      this.pendingOperator = operator;
+      this.isWaitingForOperand = true;
       return;
     }
 
@@ -164,6 +265,45 @@ export class CalcEngine {
   public calculate(): string {
     if (this.isLocked) {
       return this.errorMessage ?? "Cannot divide by zero";
+    }
+
+    if (this.isProgrammerMode || (this.pendingOperator && (
+      this.pendingOperator === "&" ||
+      this.pendingOperator === "|" ||
+      this.pendingOperator === "XOR" ||
+      this.pendingOperator === "LSH" ||
+      this.pendingOperator === "RSH" ||
+      this.pendingOperator === "<<" ||
+      this.pendingOperator === ">>"
+    ))) {
+      if (this.pendingOperator === null || this.programmerAccumulator === null) {
+        return this.getDisplay();
+      }
+
+      const currentOperand = this.parseBufferBigInt();
+      if (this.pendingOperator === "/" && currentOperand === 0n) {
+        this.setDivisionByZeroError();
+        return "Cannot divide by zero";
+      }
+
+      const op1 = this.programmerAccumulator;
+      const op = this.pendingOperator;
+      const result = this.executeProgrammerMath(op1, op, currentOperand);
+      this.programmerAccumulator = result;
+      this.accumulator = Number(BigInt.asIntN(53, result));
+      this.currentBuffer = this.formatValueForRadix(result, this.radix);
+      this.pendingOperator = null;
+      this.isWaitingForOperand = true;
+      this.pushHistory({
+        operand1: Number(BigInt.asIntN(53, op1)),
+        operator: op,
+        operand2: Number(BigInt.asIntN(53, currentOperand)),
+        result: Number(BigInt.asIntN(53, result)),
+        timestamp: Date.now(),
+        expression: `${this.formatValueForRadix(op1, this.radix)} ${op} ${this.formatValueForRadix(currentOperand, this.radix)} = ${this.currentBuffer}`,
+      });
+
+      return this.currentBuffer;
     }
 
     if (this.pendingOperator === null || this.accumulator === null) {
@@ -226,6 +366,7 @@ export class CalcEngine {
    */
   public allClear(): void {
     this.accumulator = null;
+    this.programmerAccumulator = null;
     this.pendingOperator = null;
     this.currentBuffer = "0";
     this.isWaitingForOperand = false;
@@ -326,7 +467,11 @@ export class CalcEngine {
       return null;
     }
     const entry = this.history[index];
-    this.currentBuffer = String(entry.result);
+    if (this.isProgrammerMode) {
+      this.currentBuffer = this.formatValueForRadix(BigInt(Math.trunc(entry.result)), this.radix);
+    } else {
+      this.currentBuffer = String(entry.result);
+    }
     // In idle state without pending operator, set isWaitingForOperand to true so subsequent
     // digit input starts a fresh operand rather than appending to recalled result.
     // When an operator is pending, set to false so the recalled value acts as the second operand.
@@ -558,6 +703,153 @@ export class CalcEngine {
   }
 
   /**
+   * Returns active radix numeral base ("HEX", "DEC", "OCT", or "BIN").
+   */
+  public getRadix(): RadixBase {
+    return this.radix;
+  }
+
+  /**
+   * Sets active radix numeral base and reformats the active buffer without losing value.
+   */
+  public setRadix(radix: RadixBase): void {
+    if (this.radix === radix) {
+      return;
+    }
+    if (!this.isLocked) {
+      const val = this.parseBufferBigInt();
+      this.radix = radix;
+      this.currentBuffer = this.formatValueForRadix(val, radix);
+    } else {
+      this.radix = radix;
+    }
+  }
+
+  /**
+   * Returns active bit-width word size (8, 16, 32, or 64).
+   */
+  public getWordSize(): WordSize {
+    return this.wordSize;
+  }
+
+  /**
+   * Sets active word size and clamps the active buffer and accumulator to the new bit width.
+   */
+  public setWordSize(wordSize: WordSize): void {
+    this.wordSize = wordSize;
+    if (!this.isLocked) {
+      const val = this.parseBufferBigInt();
+      const clamped = BigInt.asUintN(wordSize, val);
+      this.currentBuffer = this.formatValueForRadix(clamped, this.radix);
+      if (this.programmerAccumulator !== null) {
+        this.programmerAccumulator = BigInt.asUintN(wordSize, this.programmerAccumulator);
+      }
+    }
+  }
+
+  /**
+   * Returns true if Programmer Mode is active.
+   */
+  public isProgrammerModeActive(): boolean {
+    return this.isProgrammerMode;
+  }
+
+  /**
+   * Returns true if Programmer Mode is active.
+   */
+  public getProgrammerMode(): boolean {
+    return this.isProgrammerMode;
+  }
+
+  /**
+   * Enables or disables Programmer Mode.
+   */
+  public setProgrammerMode(enabled: boolean): void {
+    this.isProgrammerMode = enabled;
+    if (enabled) {
+      if (!this.isLocked) {
+        const floatVal = parseFloat(this.currentBuffer);
+        const intVal = Number.isFinite(floatVal) ? BigInt(Math.trunc(floatVal)) : 0n;
+        this.currentBuffer = this.formatValueForRadix(intVal, this.radix);
+        if (this.accumulator !== null) {
+          this.programmerAccumulator = BigInt(Math.trunc(this.accumulator));
+        }
+      }
+    } else {
+      if (!this.isLocked && this.radix !== "DEC") {
+        const val = this.parseBufferBigInt();
+        this.currentBuffer = val.toString(10);
+      }
+    }
+  }
+
+  /**
+   * Returns real-time multi-radix state representations across all 4 bases.
+   */
+  public getMultiRadixState(): MultiRadixState {
+    if (this.isLocked || this.errorMessage !== null) {
+      return { hex: "0", dec: "0", oct: "0", bin: "0" };
+    }
+    const val = this.parseBufferBigInt();
+    const unsignedVal = BigInt.asUintN(this.wordSize, val);
+    const signedVal = BigInt.asIntN(this.wordSize, val);
+    return {
+      hex: unsignedVal.toString(16).toUpperCase(),
+      dec: signedVal.toString(10),
+      oct: unsignedVal.toString(8),
+      bin: unsignedVal.toString(2),
+    };
+  }
+
+  /**
+   * Performs unary bitwise NOT (~) on active buffer within active word size.
+   */
+  public bitwiseNot(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBufferBigInt();
+    const inverted = BigInt.asUintN(this.wordSize, ~val);
+    this.currentBuffer = this.formatValueForRadix(inverted, this.radix);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Prepares bitwise AND operation.
+   */
+  public bitwiseAnd(): void {
+    this.inputOperator("&");
+  }
+
+  /**
+   * Prepares bitwise OR operation.
+   */
+  public bitwiseOr(): void {
+    this.inputOperator("|");
+  }
+
+  /**
+   * Prepares bitwise XOR operation.
+   */
+  public bitwiseXor(): void {
+    this.inputOperator("XOR");
+  }
+
+  /**
+   * Prepares bitwise Left Shift (<<) operation.
+   */
+  public bitwiseLsh(): void {
+    this.inputOperator("LSH");
+  }
+
+  /**
+   * Prepares bitwise Right Shift (>>) operation.
+   */
+  public bitwiseRsh(): void {
+    this.inputOperator("RSH");
+  }
+
+  /**
    * Returns a snapshot of the current engine register state.
    */
   public getState(): CalcEngineState {
@@ -573,6 +865,10 @@ export class CalcEngine {
       hasMemory: this.hasMemory(),
       history: this.getHistory(),
       angleMode: this.angleMode,
+      radix: this.radix,
+      wordSize: this.wordSize,
+      multiRadix: this.getMultiRadixState(),
+      isProgrammerMode: this.isProgrammerMode,
     };
   }
 
@@ -582,6 +878,61 @@ export class CalcEngine {
   private parseBuffer(): number {
     const val = parseFloat(this.currentBuffer);
     return Number.isNaN(val) ? 0 : val;
+  }
+
+  /**
+   * Parses active buffer into BigInt based on active radix and mode.
+   */
+  private parseBufferBigInt(): bigint {
+    if (this.currentBuffer === "0" || this.currentBuffer === "" || this.isLocked) {
+      return 0n;
+    }
+    try {
+      if (!this.isProgrammerMode && this.radix === "DEC") {
+        const floatVal = parseFloat(this.currentBuffer);
+        if (!Number.isFinite(floatVal)) return 0n;
+        return BigInt(Math.trunc(floatVal));
+      }
+      const isNegative = this.currentBuffer.startsWith("-");
+      const clean = isNegative ? this.currentBuffer.slice(1) : this.currentBuffer;
+      let val: bigint;
+      switch (this.radix) {
+        case "HEX":
+          val = BigInt("0x" + clean);
+          break;
+        case "OCT":
+          val = BigInt("0o" + clean);
+          break;
+        case "BIN":
+          val = BigInt("0b" + clean);
+          break;
+        case "DEC":
+        default:
+          val = BigInt(clean.includes(".") ? Math.trunc(parseFloat(clean)).toString() : clean);
+          break;
+      }
+      return isNegative ? -val : val;
+    } catch {
+      return 0n;
+    }
+  }
+
+  /**
+   * Formats a BigInt value into a string for the target radix base and active word size.
+   */
+  private formatValueForRadix(val: bigint, radix: RadixBase): string {
+    const unsigned = BigInt.asUintN(this.wordSize, val);
+    switch (radix) {
+      case "HEX":
+        return unsigned.toString(16).toUpperCase();
+      case "OCT":
+        return unsigned.toString(8);
+      case "BIN":
+        return unsigned.toString(2);
+      case "DEC":
+      default:
+        return BigInt.asIntN(this.wordSize, val).toString(10);
+    }
   }
 
   /**
@@ -599,7 +950,63 @@ export class CalcEngine {
         return normalizePrecision(op1 / op2);
       case "^":
         return normalizePrecision(Math.pow(op1, op2));
+      default:
+        return op2;
     }
+  }
+
+  /**
+   * Executes programmer integer and bitwise binary operations with word size clamping.
+   */
+  private executeProgrammerMath(op1: bigint, operator: Operator, op2: bigint): bigint {
+    const wordSize = this.wordSize;
+    let raw: bigint;
+    switch (operator) {
+      case "+":
+        raw = op1 + op2;
+        break;
+      case "-":
+        raw = op1 - op2;
+        break;
+      case "*":
+        raw = op1 * op2;
+        break;
+      case "/":
+        if (op2 === 0n) {
+          throw new Error("Division by zero");
+        }
+        raw = op1 / op2;
+        break;
+      case "&":
+        raw = op1 & op2;
+        break;
+      case "|":
+        raw = op1 | op2;
+        break;
+      case "^":
+      case "XOR":
+        raw = op1 ^ op2;
+        break;
+      case "<<":
+      case "LSH": {
+        const maxShift = BigInt(wordSize - 1);
+        const shift = op2 < 0n ? 0n : op2 > maxShift ? maxShift : op2;
+        raw = op1 << shift;
+        break;
+      }
+      case ">>":
+      case "RSH": {
+        const maxShift = BigInt(wordSize - 1);
+        const shift = op2 < 0n ? 0n : op2 > maxShift ? maxShift : op2;
+        const unsignedOp1 = BigInt.asUintN(wordSize, op1);
+        raw = unsignedOp1 >> shift;
+        break;
+      }
+      default:
+        raw = op2;
+        break;
+    }
+    return BigInt.asUintN(wordSize, raw);
   }
 
   /**
@@ -610,6 +1017,7 @@ export class CalcEngine {
     this.errorMessage = "Cannot divide by zero";
     this.currentBuffer = "Cannot divide by zero";
     this.accumulator = null;
+    this.programmerAccumulator = null;
     this.pendingOperator = null;
     this.isWaitingForOperand = false;
   }
@@ -622,6 +1030,7 @@ export class CalcEngine {
     this.errorMessage = msg;
     this.currentBuffer = msg;
     this.accumulator = null;
+    this.programmerAccumulator = null;
     this.pendingOperator = null;
     this.isWaitingForOperand = false;
   }
