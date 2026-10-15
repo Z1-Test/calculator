@@ -48,7 +48,7 @@ export class CalcEngine {
   private parenDepth: number = 0;
 
   /**
-   * Appends a numeric or hexadecimal digit to the active input buffer.
+   * Appends a numeric or hexadecimal digit to the active input buffer and expression.
    * If the engine is locked by an arithmetic error or the character is invalid
    * for the active radix base, input is rejected per RULE-PROG-003.
    */
@@ -103,23 +103,43 @@ export class CalcEngine {
       return;
     }
 
+    // Reset expression if previous calculation completed with '='
+    if (this.expression.includes("=")) {
+      this.expression = "";
+    }
+
     if (this.isWaitingForOperand) {
       this.currentBuffer = digit;
       this.isWaitingForOperand = false;
+      if (this.expression === "" || this.expression === "0") {
+        this.expression = digit;
+      } else {
+        this.expression += digit;
+      }
     } else {
       if (this.currentBuffer === "0") {
         this.currentBuffer = digit;
+        if (this.expression === "" || this.expression === "0") {
+          this.expression = digit;
+        } else if (this.expression.endsWith(" 0")) {
+          this.expression = this.expression.slice(0, -1) + digit;
+        } else if (this.expression.endsWith("(0")) {
+          this.expression = this.expression.slice(0, -1) + digit;
+        } else {
+          this.expression += digit;
+        }
       } else {
         // Enforce maximum buffer length of 16 significant digits
         if (this.currentBuffer.replace(".", "").length < 16) {
           this.currentBuffer += digit;
+          this.expression += digit;
         }
       }
     }
   }
 
   /**
-   * Appends a decimal point to the active buffer.
+   * Appends a decimal point to the active buffer and expression.
    * Ignores redundant decimal points if one already exists in the buffer.
    * Disabled in Programmer Mode per RULE-PROG-003.
    */
@@ -128,21 +148,36 @@ export class CalcEngine {
       return;
     }
 
+    if (this.expression.includes("=")) {
+      this.expression = "";
+    }
+
     if (this.isWaitingForOperand) {
       this.currentBuffer = "0.";
       this.isWaitingForOperand = false;
+      this.expression += (this.expression === "" || this.expression.endsWith(" ") || this.expression.endsWith("(")) ? "0." : ".";
     } else if (!this.currentBuffer.includes(".")) {
       this.currentBuffer += ".";
+      this.expression += ".";
     }
   }
 
   /**
-   * Removes the last entered character from the active buffer.
+   * Removes the last entered character from the active buffer and expression.
    * If the buffer only contains a single character or is waiting for an operand,
    * resets the buffer back to "0".
    */
   public backspace(): void {
-    if (this.isLocked || this.isWaitingForOperand) {
+    if (this.isLocked) {
+      return;
+    }
+
+    if (this.isWaitingForOperand) {
+      if (this.expression.endsWith("(")) {
+        this.expression = this.expression.slice(0, -1);
+        this.parenDepth = Math.max(0, this.parenDepth - 1);
+        this.isWaitingForOperand = false;
+      }
       return;
     }
 
@@ -154,24 +189,110 @@ export class CalcEngine {
     } else {
       this.currentBuffer = "0";
     }
+
+    if (this.expression.length > 0) {
+      const lastChar = this.expression[this.expression.length - 1];
+      if (lastChar === "(") {
+        this.parenDepth = Math.max(0, this.parenDepth - 1);
+      } else if (lastChar === ")") {
+        this.parenDepth++;
+      }
+      this.expression = this.expression.slice(0, -1);
+    }
   }
 
   /**
-   * Ingests an arithmetic or bitwise operator.
+   * Appends an opening or closing parenthesis to the formula expression.
+   * Enforces nesting depth invariants and rejects unbalanced closing parentheses.
+   */
+  public inputParenthesis(paren: "(" | ")"): void {
+    if (this.isLocked) {
+      return;
+    }
+
+    if (this.expression.includes("=")) {
+      this.expression = "";
+    }
+
+    if (paren === "(") {
+      if (!this.isWaitingForOperand && this.currentBuffer !== "0" && this.expression !== "") {
+        this.expression += " * (";
+      } else if (this.expression === "" || this.expression === "0") {
+        this.expression = "(";
+      } else {
+        this.expression += "(";
+      }
+      this.parenDepth++;
+      this.currentBuffer = "0";
+      this.isWaitingForOperand = true;
+    } else if (paren === ")") {
+      // Reject closing paren if parenDepth is 0 per DEC-EXPR-01
+      if (this.parenDepth === 0) {
+        return;
+      }
+
+      this.expression += ")";
+      this.parenDepth--;
+      this.isWaitingForOperand = false;
+
+      // Provide live sub-expression evaluation preview in buffer if parseable
+      try {
+        const preview = this.evaluateExpression(this.expression);
+        this.currentBuffer = String(preview);
+      } catch {
+        // preserve currentBuffer
+      }
+    }
+  }
+
+  /**
+   * Returns the ongoing formula expression string suitable for display.
+   */
+  public getExpression(): string {
+    return this.expression;
+  }
+
+  /**
+   * Ingests an arithmetic or bitwise operator (+, -, *, /, ^, &, |, XOR, etc.).
    *
    * In immediate execution mode:
    * - If an operator was already entered and no new digits followed,
    *   the new operator replaces the pending operator (e.g. 5 + * 2 -> 5 * 2).
-   * - Otherwise, evaluates any pending operation immediately left-to-right.
+   * - Otherwise, evaluates any pending operation immediately left-to-right
+   *   when not nested inside parentheses.
    */
   public inputOperator(operator: Operator): void {
     if (this.isLocked) {
       return;
     }
 
-    // Consecutive operator replacement
-    if (this.pendingOperator !== null && this.isWaitingForOperand) {
+    // Reset expression if previous calculation completed
+    if (this.expression.includes("=")) {
+      this.expression = `${this.currentBuffer} ${operator} `;
       this.pendingOperator = operator;
+      this.accumulator = this.parseBuffer();
+      this.isWaitingForOperand = true;
+      return;
+    }
+
+    // Consecutive operator replacement per RULE-CALC-007
+    if (this.pendingOperator !== null && this.isWaitingForOperand && !this.expression.endsWith("(")) {
+      this.pendingOperator = operator;
+      this.expression = this.expression.replace(/[\+\-\*\/\^]\s*$/, `${operator} `);
+      return;
+    }
+
+    // Append operator to expression
+    if (this.expression === "" || this.expression === "0") {
+      this.expression = `${this.currentBuffer} ${operator} `;
+    } else {
+      this.expression += ` ${operator} `;
+    }
+
+    // When inside parentheses or expression contains parens, do not prematurely collapse
+    if (this.parenDepth > 0 || this.expression.includes("(") || this.expression.includes(")")) {
+      this.pendingOperator = operator;
+      this.isWaitingForOperand = true;
       return;
     }
 
@@ -223,7 +344,7 @@ export class CalcEngine {
     if (this.accumulator === null) {
       this.accumulator = currentOperand;
     } else if (this.pendingOperator !== null) {
-      // Immediate evaluation
+      // Immediate evaluation for standard sequential pocket calculator mode
       if (this.pendingOperator === "/" && currentOperand === 0) {
         this.setDivisionByZeroError();
         return;
@@ -262,6 +383,7 @@ export class CalcEngine {
 
   /**
    * Executes the pending arithmetic calculation and updates registers.
+   * Auto-balances unclosed parentheses and applies algebraic precedence (BODMAS/PEMDAS).
    * Returns the final display string (result or error).
    */
   public calculate(): string {
@@ -308,6 +430,41 @@ export class CalcEngine {
       return this.currentBuffer;
     }
 
+    // Auto-balance unclosed open parentheses per DEC-EXPR-02 & REC-EXPR-01
+    while (this.parenDepth > 0) {
+      this.expression += ")";
+      this.parenDepth--;
+    }
+
+    // If expression contains parentheses or explicit formula expression
+    if (this.expression.includes("(") || this.expression.includes(")")) {
+      const exprToEval = this.expression;
+      try {
+        const result = this.evaluateExpression(exprToEval);
+        this.accumulator = result;
+        this.currentBuffer = String(result);
+        this.pendingOperator = null;
+        this.isWaitingForOperand = true;
+        this.pushHistory({
+          operand1: 0,
+          operator: "+",
+          operand2: result,
+          result,
+          timestamp: Date.now(),
+          expression: `${exprToEval} = ${result}`,
+        });
+        this.expression = `${exprToEval} = ${result}`;
+        return this.currentBuffer;
+      } catch (err: any) {
+        if (err.message === "Cannot divide by zero") {
+          this.setDivisionByZeroError();
+          return "Cannot divide by zero";
+        }
+        this.setDomainError("Invalid input");
+        return "Invalid input";
+      }
+    }
+
     if (this.pendingOperator === null || this.accumulator === null) {
       return this.getDisplay();
     }
@@ -336,14 +493,16 @@ export class CalcEngine {
     this.currentBuffer = String(result);
     this.pendingOperator = null;
     this.isWaitingForOperand = true;
+    const exprStr = `${op1} ${op} ${currentOperand} = ${result}`;
     this.pushHistory({
       operand1: op1,
       operator: op,
       operand2: currentOperand,
       result,
       timestamp: Date.now(),
-      expression: `${op1} ${op} ${currentOperand} = ${result}`,
+      expression: exprStr,
     });
+    this.expression = exprStr;
 
     return this.currentBuffer;
   }
@@ -360,6 +519,11 @@ export class CalcEngine {
     }
     this.currentBuffer = "0";
     this.isWaitingForOperand = false;
+    if (this.expression.includes("=")) {
+      this.expression = "";
+    } else {
+      this.expression = this.expression.replace(/[0-9.]+\s*$/, "");
+    }
   }
 
   /**
@@ -374,6 +538,235 @@ export class CalcEngine {
     this.isWaitingForOperand = false;
     this.isLocked = false;
     this.errorMessage = null;
+    this.expression = "";
+    this.parenDepth = 0;
+  }
+
+  /**
+   * Evaluates an algebraic mathematical expression adhering strictly to
+   * standard operator precedence (BODMAS/PEMDAS: Parentheses, Exponents,
+   * Multiplication/Division, Addition/Subtraction).
+   *
+   * Executes without dynamic eval() or new Function() per NEVER-CALC-001.
+   * Enforces division by zero safeguard per RULE-CALC-001 and
+   * precision normalization per RULE-CALC-002.
+   */
+  public evaluateExpression(expr: string): number {
+    if (!expr || expr.trim() === "") {
+      return 0;
+    }
+
+    // Strip trailing equals if present
+    const cleanExpr = expr.replace(/=\s*$/, "").trim();
+
+    // 1. Tokenize expression
+    const tokens: string[] = [];
+    let i = 0;
+    const len = cleanExpr.length;
+
+    while (i < len) {
+      const ch = cleanExpr[i];
+
+      if (/\s/.test(ch)) {
+        i++;
+        continue;
+      }
+
+      if (ch === "(" || ch === ")") {
+        tokens.push(ch);
+        i++;
+        continue;
+      }
+
+      if (ch === "+" || ch === "*" || ch === "/" || ch === "^") {
+        tokens.push(ch);
+        i++;
+        continue;
+      }
+
+      if (ch === "-") {
+        // Distinguish binary minus from unary negative number
+        const prevToken = tokens[tokens.length - 1];
+        const isUnary =
+          tokens.length === 0 ||
+          prevToken === "(" ||
+          prevToken === "+" ||
+          prevToken === "-" ||
+          prevToken === "*" ||
+          prevToken === "/" ||
+          prevToken === "^";
+
+        if (isUnary && i + 1 < len && /[0-9.]/.test(cleanExpr[i + 1])) {
+          let numStr = "-";
+          i++;
+          while (i < len && /[0-9.]/.test(cleanExpr[i])) {
+            numStr += cleanExpr[i];
+            i++;
+          }
+          tokens.push(numStr);
+          continue;
+        } else {
+          tokens.push("-");
+          i++;
+          continue;
+        }
+      }
+
+      if (/[0-9.]/.test(ch)) {
+        let numStr = "";
+        while (i < len && /[0-9.]/.test(cleanExpr[i])) {
+          numStr += cleanExpr[i];
+          i++;
+        }
+        tokens.push(numStr);
+        continue;
+      }
+
+      i++;
+    }
+
+    if (tokens.length === 0) {
+      return 0;
+    }
+
+    // Handle implicit multiplication: e.g. 2(3) -> 2 * (3), (2)(3) -> (2) * (3), (2)3 -> (2) * 3
+    const expandedTokens: string[] = [];
+    for (let k = 0; k < tokens.length; k++) {
+      const curr = tokens[k];
+      const prev = expandedTokens[expandedTokens.length - 1];
+
+      if (prev) {
+        const prevIsNumOrClose = !["+", "-", "*", "/", "^", "("].includes(prev);
+        const currIsNumOrOpen = !["+", "-", "*", "/", "^", ")"].includes(curr);
+
+        if (prevIsNumOrClose && curr === "(") {
+          expandedTokens.push("*");
+        } else if (prev === ")" && currIsNumOrOpen) {
+          expandedTokens.push("*");
+        }
+      }
+      expandedTokens.push(curr);
+    }
+
+    // Auto-balance unclosed open parentheses in tokens
+    let openCount = 0;
+    for (const t of expandedTokens) {
+      if (t === "(") openCount++;
+      if (t === ")") openCount = Math.max(0, openCount - 1);
+    }
+    while (openCount > 0) {
+      expandedTokens.push(")");
+      openCount--;
+    }
+
+    // 2. Shunting-Yard Algorithm to convert infix tokens to RPN
+    const precedence: Record<string, number> = {
+      "+": 2,
+      "-": 2,
+      "*": 3,
+      "/": 3,
+      "^": 4,
+    };
+
+    const isRightAssociative: Record<string, boolean> = {
+      "^": true,
+    };
+
+    const outputQueue: string[] = [];
+    const operatorStack: string[] = [];
+
+    for (const token of expandedTokens) {
+      if (token === "(") {
+        operatorStack.push(token);
+      } else if (token === ")") {
+        while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1] !== "(") {
+          outputQueue.push(operatorStack.pop()!);
+        }
+        if (operatorStack.length > 0 && operatorStack[operatorStack.length - 1] === "(") {
+          operatorStack.pop();
+        }
+      } else if (token in precedence) {
+        const op1 = token;
+        const prec1 = precedence[op1];
+        const rightAssoc = isRightAssociative[op1] ?? false;
+
+        while (operatorStack.length > 0) {
+          const top = operatorStack[operatorStack.length - 1];
+          if (top === "(") break;
+          const precTop = precedence[top] ?? 0;
+          if ((!rightAssoc && prec1 <= precTop) || (rightAssoc && prec1 < precTop)) {
+            outputQueue.push(operatorStack.pop()!);
+          } else {
+            break;
+          }
+        }
+        operatorStack.push(op1);
+      } else {
+        outputQueue.push(token);
+      }
+    }
+
+    while (operatorStack.length > 0) {
+      const op = operatorStack.pop()!;
+      if (op !== "(" && op !== ")") {
+        outputQueue.push(op);
+      }
+    }
+
+    if (outputQueue.length === 0) {
+      return 0;
+    }
+
+    // 3. Evaluate RPN
+    const evalStack: number[] = [];
+
+    for (const token of outputQueue) {
+      if (token in precedence) {
+        if (evalStack.length < 2) {
+          if (evalStack.length === 1 && token === "-") {
+            const val = evalStack.pop()!;
+            evalStack.push(normalizePrecision(-val));
+            continue;
+          }
+          continue;
+        }
+        const b = evalStack.pop()!;
+        const a = evalStack.pop()!;
+
+        switch (token) {
+          case "+":
+            evalStack.push(normalizePrecision(a + b));
+            break;
+          case "-":
+            evalStack.push(normalizePrecision(a - b));
+            break;
+          case "*":
+            evalStack.push(normalizePrecision(a * b));
+            break;
+          case "/":
+            if (b === 0) {
+              throw new Error("Cannot divide by zero");
+            }
+            evalStack.push(normalizePrecision(a / b));
+            break;
+          case "^":
+            if (a === 0 && b < 0) {
+              throw new Error("Cannot divide by zero");
+            }
+            if (a < 0 && !Number.isInteger(b)) {
+              throw new Error("Invalid input");
+            }
+            evalStack.push(normalizePrecision(Math.pow(a, b)));
+            break;
+        }
+      } else {
+        const num = parseFloat(token);
+        evalStack.push(Number.isNaN(num) ? 0 : num);
+      }
+    }
+
+    const finalResult = evalStack.length > 0 ? evalStack[evalStack.length - 1] : 0;
+    return normalizePrecision(finalResult);
   }
 
   /**
