@@ -703,6 +703,111 @@ describe("Precision Arithmetic Engine (CalcEngine)", () => {
     });
   });
 
+  describe("9b. Audit Tape Export Serialization (CASE-EXP-01 to CASE-EXP-05, RULE-EXP-001)", () => {
+    it("should export empty history tape to CSV with header row only (CASE-EXP-05)", () => {
+      const engine = new CalcEngine();
+      const csv = engine.exportHistoryToCSV();
+      assert.equal(csv, "timestamp,expression,result\n");
+
+      // With includeHeader: false
+      const noHeaderCsv = engine.exportHistoryToCSV({ includeHeader: false });
+      assert.equal(noHeaderCsv, "");
+    });
+
+    it("should export empty history tape to formatted text with friendly notice (CASE-EXP-05)", () => {
+      const engine = new CalcEngine();
+      const text = engine.exportHistoryToText();
+      assert.equal(text, "(No calculation entries recorded)\n");
+    });
+
+    it("should export calculation records to standard RFC 4180 CSV (CASE-EXP-01, CASE-EXP-03)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("2");
+      engine.inputOperator("+");
+      engine.inputDigit("3");
+      engine.calculate(); // 2 + 3 = 5
+
+      engine.inputDigit("1");
+      engine.inputDigit("0");
+      engine.inputOperator("*");
+      engine.inputDigit("4");
+      engine.calculate(); // 10 * 4 = 40
+
+      const csv = engine.exportHistoryToCSV();
+      const lines = csv.trim().split("\n");
+      assert.equal(lines.length, 3);
+      assert.equal(lines[0], "timestamp,expression,result");
+
+      const [ts1, expr1, res1] = lines[1].split(",");
+      assert.ok(!Number.isNaN(Date.parse(ts1)));
+      assert.equal(expr1, "2 + 3 = 5");
+      assert.equal(res1, "5");
+
+      const [ts2, expr2, res2] = lines[2].split(",");
+      assert.ok(!Number.isNaN(Date.parse(ts2)));
+      assert.equal(expr2, "10 * 4 = 40");
+      assert.equal(res2, "40");
+    });
+
+    it("should escape commas, quotes, and newlines in CSV per RFC 4180 (CASE-EXP-02, NEVER-EXP-001)", () => {
+      const engine = new CalcEngine();
+      // Inject record with special chars into history to test edge-case escaping
+      (engine as any).history.push({
+        operand1: 2000,
+        operator: "+",
+        operand2: 500,
+        result: 2500,
+        timestamp: 1700000000000,
+        expression: 'format("2,000 + 500") = 2500',
+      });
+
+      const csv = engine.exportHistoryToCSV();
+      const lines = csv.trim().split("\n");
+      assert.equal(lines.length, 2);
+      assert.equal(lines[1], '2023-11-14T22:13:20.000Z,"format(""2,000 + 500"") = 2500",2500');
+    });
+
+    it("should support custom delimiter in exportHistoryToCSV", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("7");
+      engine.inputOperator("*");
+      engine.inputDigit("6");
+      engine.calculate(); // 7 * 6 = 42
+
+      const tsv = engine.exportHistoryToCSV({ delimiter: "\t" });
+      const lines = tsv.trim().split("\n");
+      assert.equal(lines[0], "timestamp\texpression\tresult");
+      const parts = lines[1].split("\t");
+      assert.equal(parts.length, 3);
+      assert.equal(parts[1], "7 * 6 = 42");
+      assert.equal(parts[2], "42");
+    });
+
+    it("should export calculation records to human-readable plain text (CASE-EXP-04)", () => {
+      const engine = new CalcEngine();
+      engine.inputDigit("5");
+      engine.inputOperator("+");
+      engine.inputDigit("5");
+      engine.calculate(); // 5 + 5 = 10
+
+      engine.inputDigit("2");
+      engine.inputDigit("0");
+      engine.inputOperator("/");
+      engine.inputDigit("4");
+      engine.calculate(); // 20 / 4 = 5
+
+      const text = engine.exportHistoryToText();
+      const lines = text.trim().split("\n");
+      assert.equal(lines.length, 2);
+
+      const regex = /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\] (.+)$/;
+      assert.match(lines[0], regex);
+      assert.ok(lines[0].endsWith("5 + 5 = 10"));
+      assert.match(lines[1], regex);
+      assert.ok(lines[1].endsWith("20 / 4 = 5"));
+    });
+  });
+
   describe("10. Scientific Operations & Angle Modes (CASE-SCI-01 to CASE-SCI-08)", () => {
     it("should initialize in DEG mode and toggle between DEG and RAD (CASE-SCI-01)", () => {
       const engine = new CalcEngine();

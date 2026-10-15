@@ -93,3 +93,18 @@ export interface CalculationRecord {
   /** Formatted expression string (e.g. '2 + 3 = 5') */
   expression: string;
 }
+
+/**
+ * Supported file formats for calculation history tape export.
+ */
+export type ExportTapeFormat = "csv" | "txt";
+
+/**
+ * Options configuring calculation history tape serialization.
+ */
+export interface ExportTapeOptions {
+  /** Column delimiter for CSV export (defaults to comma ',') */
+  delimiter?: string;
+  /** Whether to output the initial header row (defaults to true) */
+  includeHeader?: boolean;
+}

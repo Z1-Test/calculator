@@ -2,6 +2,8 @@ import type {
   AngleMode,
   CalcEngineState,
   CalculationRecord,
+  ExportTapeFormat,
+  ExportTapeOptions,
   MultiRadixState,
   Operator,
   RadixBase,
@@ -879,6 +881,74 @@ export class CalcEngine {
    */
   public clearHistory(): void {
     this.history = [];
+  }
+
+  /**
+   * Serializes the calculation history tape into standard RFC 4180 CSV format.
+   * Format: timestamp,expression,result\n
+   * Quotes and escapes formulas containing delimiters or quotation marks per RULE-EXP-001.
+   */
+  public exportHistoryToCSV(options?: ExportTapeOptions): string {
+    const delimiter = options?.delimiter ?? ",";
+    const includeHeader = options?.includeHeader ?? true;
+
+    let csv = includeHeader ? `timestamp${delimiter}expression${delimiter}result\n` : "";
+
+    for (const record of this.history) {
+      const isoTimestamp = new Date(record.timestamp).toISOString();
+      const escapedExpression = this.escapeCsvField(record.expression, delimiter);
+      csv += `${isoTimestamp}${delimiter}${escapedExpression}${delimiter}${record.result}\n`;
+    }
+
+    return csv;
+  }
+
+  /**
+   * Serializes the calculation history tape into formatted human-readable plain text.
+   * Format: [YYYY-MM-DD HH:mm:ss UTC] <expression> = <result>\n
+   * Returns empty indicator notice if history contains zero records per RULE-EXP-001.
+   */
+  public exportHistoryToText(options?: ExportTapeOptions): string {
+    if (this.history.length === 0) {
+      return "(No calculation entries recorded)\n";
+    }
+
+    let text = "";
+    for (const record of this.history) {
+      const timeStr = this.formatUtcTimestamp(record.timestamp);
+      const expr = record.expression.includes("=")
+        ? record.expression
+        : `${record.expression} = ${record.result}`;
+      text += `[${timeStr}] ${expr}\n`;
+    }
+
+    return text;
+  }
+
+  /**
+   * Escapes a CSV field conforming to RFC 4180.
+   */
+  private escapeCsvField(val: string, delimiter: string): string {
+    if (val.includes('"') || val.includes(delimiter) || val.includes("\n") || val.includes("\r")) {
+      return `"${val.replace(/"/g, '""')}"`;
+    }
+    return val;
+  }
+
+  /**
+   * Formats a millisecond epoch timestamp as human-readable UTC timestamp string:
+   * YYYY-MM-DD HH:mm:ss UTC
+   */
+  private formatUtcTimestamp(ts: number): string {
+    const d = new Date(ts);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const year = d.getUTCFullYear();
+    const month = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hours = pad(d.getUTCHours());
+    const minutes = pad(d.getUTCMinutes());
+    const seconds = pad(d.getUTCSeconds());
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
   }
 
   /**
