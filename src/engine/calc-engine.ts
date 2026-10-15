@@ -1,4 +1,4 @@
-import type { CalcEngineState, CalculationRecord, Operator } from "./types.ts";
+import type { AngleMode, CalcEngineState, CalculationRecord, Operator } from "./types.ts";
 
 /**
  * Truncates and normalizes IEEE-754 binary floating-point representation noise
@@ -29,6 +29,7 @@ export class CalcEngine {
   private memory: number = 0;
   private static readonly MAX_HISTORY: number = 50;
   private history: CalculationRecord[] = [];
+  private angleMode: AngleMode = "DEG";
 
   /**
    * Appends a numeric digit (0-9) to the active input buffer.
@@ -124,6 +125,16 @@ export class CalcEngine {
         this.setDivisionByZeroError();
         return;
       }
+      if (this.pendingOperator === "^") {
+        if (this.accumulator === 0 && currentOperand < 0) {
+          this.setDivisionByZeroError();
+          return;
+        }
+        if (this.accumulator !== null && this.accumulator < 0 && !Number.isInteger(currentOperand)) {
+          this.setDomainError("Invalid input");
+          return;
+        }
+      }
 
       const op1 = this.accumulator;
       const op = this.pendingOperator;
@@ -164,6 +175,16 @@ export class CalcEngine {
     if (this.pendingOperator === "/" && currentOperand === 0) {
       this.setDivisionByZeroError();
       return "Cannot divide by zero";
+    }
+    if (this.pendingOperator === "^") {
+      if (this.accumulator === 0 && currentOperand < 0) {
+        this.setDivisionByZeroError();
+        return "Cannot divide by zero";
+      }
+      if (this.accumulator !== null && this.accumulator < 0 && !Number.isInteger(currentOperand)) {
+        this.setDomainError("Invalid input");
+        return "Invalid input";
+      }
     }
 
     const op1 = this.accumulator;
@@ -331,6 +352,212 @@ export class CalcEngine {
   }
 
   /**
+   * Returns active angle mode ("DEG" or "RAD").
+   */
+  public getAngleMode(): AngleMode {
+    return this.angleMode;
+  }
+
+  /**
+   * Toggles the angle mode between "DEG" and "RAD".
+   * Returns the updated angle mode.
+   */
+  public toggleAngleMode(): AngleMode {
+    this.angleMode = this.angleMode === "DEG" ? "RAD" : "DEG";
+    return this.angleMode;
+  }
+
+  /**
+   * Evaluates sine function on active buffer value with respect to active angle mode.
+   */
+  public sin(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    let res: number;
+    if (this.angleMode === "DEG") {
+      const mod = val % 360;
+      if (mod === 0 || Math.abs(mod) === 180) {
+        res = 0;
+      } else if (mod === 90 || mod === -270) {
+        res = 1;
+      } else if (mod === 270 || mod === -90) {
+        res = -1;
+      } else {
+        res = Math.sin(val * (Math.PI / 180));
+      }
+    } else {
+      res = Math.sin(val);
+    }
+    const normalized = normalizePrecision(res);
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates cosine function on active buffer value with respect to active angle mode.
+   */
+  public cos(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    let res: number;
+    if (this.angleMode === "DEG") {
+      const mod = val % 360;
+      if (Math.abs(mod) === 90 || Math.abs(mod) === 270) {
+        res = 0;
+      } else if (mod === 0) {
+        res = 1;
+      } else if (Math.abs(mod) === 180) {
+        res = -1;
+      } else {
+        res = Math.cos(val * (Math.PI / 180));
+      }
+    } else {
+      res = Math.cos(val);
+    }
+    const normalized = normalizePrecision(res);
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates tangent function on active buffer value with respect to active angle mode.
+   * Asymptotes trigger an "Invalid input" domain error state.
+   */
+  public tan(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    let res: number;
+    if (this.angleMode === "DEG") {
+      if (Math.abs(val % 180) === 90) {
+        this.setDomainError("Invalid input");
+        return;
+      }
+      const mod = val % 180;
+      if (mod === 0) {
+        res = 0;
+      } else if (mod === 45 || mod === -135) {
+        res = 1;
+      } else if (mod === 135 || mod === -45) {
+        res = -1;
+      } else {
+        res = Math.tan(val * (Math.PI / 180));
+      }
+    } else {
+      if (Math.abs(Math.cos(val)) < 1e-15) {
+        this.setDomainError("Invalid input");
+        return;
+      }
+      res = Math.tan(val);
+    }
+    const normalized = normalizePrecision(res);
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates square (x²) on active buffer value.
+   */
+  public square(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    const normalized = normalizePrecision(val * val);
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates square root (√) on active buffer value.
+   * Negative inputs trigger an "Invalid input" domain error state.
+   */
+  public sqrt(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    if (val < 0) {
+      this.setDomainError("Invalid input");
+      return;
+    }
+    const normalized = normalizePrecision(Math.sqrt(val));
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates reciprocal (1/x) on active buffer value.
+   * Zero input triggers a "Cannot divide by zero" error state.
+   */
+  public reciprocal(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    if (val === 0) {
+      this.setDivisionByZeroError();
+      return;
+    }
+    const normalized = normalizePrecision(1 / val);
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates natural logarithm (ln) on active buffer value.
+   * Non-positive inputs trigger an "Invalid input" domain error state.
+   */
+  public ln(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    if (val <= 0) {
+      this.setDomainError("Invalid input");
+      return;
+    }
+    const normalized = normalizePrecision(Math.log(val));
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Evaluates common base-10 logarithm (log) on active buffer value.
+   * Non-positive inputs trigger an "Invalid input" domain error state.
+   */
+  public log(): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = this.parseBuffer();
+    if (val <= 0) {
+      this.setDomainError("Invalid input");
+      return;
+    }
+    const normalized = normalizePrecision(Math.log10(val));
+    this.currentBuffer = String(normalized);
+    this.isWaitingForOperand = true;
+  }
+
+  /**
+   * Inserts a mathematical constant (π or e) into the active buffer.
+   */
+  public inputConstant(constant: "pi" | "e"): void {
+    if (this.isLocked) {
+      return;
+    }
+    const val = constant === "pi" ? Math.PI : Math.E;
+    this.currentBuffer = String(normalizePrecision(val));
+    this.isWaitingForOperand = true;
+  }
+
+  /**
    * Returns a snapshot of the current engine register state.
    */
   public getState(): CalcEngineState {
@@ -345,6 +572,7 @@ export class CalcEngine {
       memory: this.memory,
       hasMemory: this.hasMemory(),
       history: this.getHistory(),
+      angleMode: this.angleMode,
     };
   }
 
@@ -369,6 +597,8 @@ export class CalcEngine {
         return normalizePrecision(op1 * op2);
       case "/":
         return normalizePrecision(op1 / op2);
+      case "^":
+        return normalizePrecision(Math.pow(op1, op2));
     }
   }
 
@@ -379,6 +609,18 @@ export class CalcEngine {
     this.isLocked = true;
     this.errorMessage = "Cannot divide by zero";
     this.currentBuffer = "Cannot divide by zero";
+    this.accumulator = null;
+    this.pendingOperator = null;
+    this.isWaitingForOperand = false;
+  }
+
+  /**
+   * Locks the engine in an error state on mathematical domain errors.
+   */
+  private setDomainError(msg: string = "Invalid input"): void {
+    this.isLocked = true;
+    this.errorMessage = msg;
+    this.currentBuffer = msg;
     this.accumulator = null;
     this.pendingOperator = null;
     this.isWaitingForOperand = false;

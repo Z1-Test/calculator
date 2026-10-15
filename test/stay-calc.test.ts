@@ -948,4 +948,145 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       assert.ok(!css.includes("!important"), "Strictly zero !important across stylesheets");
     });
   });
+
+  describe("11. Scientific Keypad Panel & UI Navigation (CASE-SCI-09 to CASE-SCI-11)", () => {
+    it("should initialize with scientific keypad closed and aria-expanded = false (CASE-SCI-09)", () => {
+      assert.equal(calc.getScientificOpen(), false);
+      assert.equal(calc.isScientificKeypadOpen(), false);
+
+      const keypad = calc.shadowRoot!.getElementById("scientific-keypad");
+      const toggle = calc.shadowRoot!.getElementById("scientific-toggle");
+
+      assert.ok(keypad);
+      assert.ok(toggle);
+      assert.equal(keypad.classList.contains("open"), false);
+      assert.equal(toggle.getAttribute("aria-expanded"), "false");
+      assert.equal(toggle.getAttribute("aria-controls"), "scientific-keypad");
+    });
+
+    it("should toggle scientific keypad open and closed on #scientific-toggle button click (CASE-SCI-09)", () => {
+      const toggle = calc.shadowRoot!.getElementById("scientific-toggle");
+      const keypad = calc.shadowRoot!.getElementById("scientific-keypad");
+
+      // Open keypad
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getScientificOpen(), true);
+      assert.equal(keypad?.classList.contains("open"), true);
+      assert.equal(toggle?.getAttribute("aria-expanded"), "true");
+
+      // Close keypad
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getScientificOpen(), false);
+      assert.equal(keypad?.classList.contains("open"), false);
+      assert.equal(toggle?.getAttribute("aria-expanded"), "false");
+    });
+
+    it("should toggle angle mode and update button label on #angle-mode-toggle button click (CASE-SCI-01)", () => {
+      const angleBtn = calc.shadowRoot!.getElementById("angle-mode-toggle");
+      assert.ok(angleBtn);
+      assert.equal(angleBtn.textContent, "DEG");
+      assert.equal(calc.engine.getAngleMode(), "DEG");
+
+      // Toggle to RAD
+      angleBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getAngleMode(), "RAD");
+      assert.equal(angleBtn.textContent, "RAD");
+
+      // Toggle back to DEG
+      angleBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getAngleMode(), "DEG");
+      assert.equal(angleBtn.textContent, "DEG");
+    });
+
+    it("should evaluate scientific operations via button clicks", () => {
+      // 1. sin(30) = 0.5 in DEG
+      calc.executeAction("digit", "3");
+      calc.executeAction("digit", "0");
+      const sinBtn = calc.shadowRoot!.querySelector('button[data-action="sin"]');
+      sinBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0.5");
+
+      // 2. Square: 5² = 25
+      calc.executeAction("clear");
+      calc.executeAction("digit", "5");
+      const sqBtn = calc.shadowRoot!.querySelector('button[data-action="square"]');
+      sqBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "25");
+
+      // 3. Square Root: √16 = 4
+      calc.executeAction("clear");
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "6");
+      const sqrtBtn = calc.shadowRoot!.querySelector('button[data-action="sqrt"]');
+      sqrtBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "4");
+
+      // 4. Reciprocal: 1/4 = 0.25
+      const recipBtn = calc.shadowRoot!.querySelector('button[data-action="reciprocal"]');
+      recipBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0.25");
+
+      // 5. Constants pi and e
+      calc.executeAction("clear");
+      const piBtn = calc.shadowRoot!.querySelector('button[data-value="pi"]');
+      assert.ok(piBtn);
+      piBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "3.1415926536");
+
+      calc.executeAction("clear");
+      const eBtn = calc.shadowRoot!.querySelector('button[data-value="e"]');
+      assert.ok(eBtn);
+      eBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "2.7182818285");
+    });
+
+    it("should evaluate power operation via keyboard key ^ (CASE-SCI-10)", () => {
+      // 2 ^ 3 = 8
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "2" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "^" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "3" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+      assert.equal(calc.getDisplayValue(), "8");
+    });
+
+    it("should provide accessible aria-labels and tactile pill styling on all scientific buttons (CASE-SCI-10)", () => {
+      const keypad = calc.shadowRoot!.getElementById("scientific-keypad");
+      assert.ok(keypad);
+      const buttons = keypad.querySelectorAll("button");
+      assert.equal(buttons.length, 12);
+
+      for (const btn of buttons) {
+        assert.ok(btn.hasAttribute("aria-label"), `Button ${btn.textContent} missing aria-label`);
+        assert.ok(btn.getAttribute("aria-label")!.length > 0);
+      }
+    });
+
+    it("should enforce mobile zero-overflow styling across 320px-390px viewports (CASE-SCI-11)", () => {
+      const styleEl = calc.shadowRoot!.querySelector("style");
+      assert.ok(styleEl);
+      const css = styleEl.textContent;
+
+      assert.ok(css.includes(".scientific-keypad"));
+      assert.ok(css.includes(".scientific-grid"));
+      assert.ok(css.includes("repeat(4, 1fr)"));
+      assert.ok(css.includes("overflow-x: hidden"));
+      assert.ok(css.includes("box-sizing: border-box"));
+      assert.ok(!css.includes("!important"), "Strictly zero !important across stylesheets");
+    });
+
+    it("should preserve active buffer and display when toggling scientific panel (NEVER-CALC-002)", () => {
+      calc.executeAction("digit", "8");
+      calc.executeAction("digit", "9");
+      assert.equal(calc.getDisplayValue(), "89");
+
+      calc.toggleScientific();
+      assert.equal(calc.getDisplayValue(), "89");
+      assert.equal(calc.getScientificOpen(), true);
+
+      calc.toggleScientific();
+      assert.equal(calc.getDisplayValue(), "89");
+      assert.equal(calc.getScientificOpen(), false);
+    });
+  });
 });
+

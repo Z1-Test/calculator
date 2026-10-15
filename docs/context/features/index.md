@@ -8,3 +8,4 @@ okf_version: "0.2"
 * [calculation-history-tape](calculation-history-tape/) - Contains Test Cases, Feature, Flow concepts.
 * [memory-registers-status-badge](memory-registers-status-badge/) - Contains Test Cases, Feature, Flow concepts.
 * [precision-arithmetic-engine](precision-arithmetic-engine/) - Contains Test Cases, Feature, Flow concepts.
+* [scientific-mode-toggle](scientific-mode-toggle/) - Contains Test Cases, Feature, Flow concepts.
