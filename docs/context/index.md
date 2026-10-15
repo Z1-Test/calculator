@@ -9,5 +9,6 @@ okf_version: "0.2"
 # Directories
 
 * [decisions](decisions/) - Architectural Decision Records (ADRs).
+* [features](features/) - Contains Test Cases, Feature, Flow concepts.
 * [project](project/) - Core architecture, conventions, tech stack, vision, and architectural decisions.
 * [system](system/) - Contains Specification, Policy, Concept concepts.
