@@ -72,6 +72,21 @@ const STYLES = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .expression-display {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--calc-text-secondary, #71717a);
+    min-height: 18px;
+    line-height: 1.38;
+    text-align: right;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 2px;
+    box-sizing: border-box;
+  }
   .display-value {
     font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
     font-size: 36px;
@@ -537,6 +552,7 @@ const TEMPLATE_HTML = `
           <span class="memory-badge" id="memory-badge" part="memory-badge" aria-label="Memory Active" style="display: none;">M</span>
           <span class="display-status" id="display-status" part="status"></span>
         </header>
+        <div class="expression-display" id="expression-display" part="expression" role="status" aria-label="Expression formula" aria-live="polite"></div>
         <div class="display-value" id="display-value" part="value">0</div>
       </div>
     </slot>
@@ -601,6 +617,9 @@ const TEMPLATE_HTML = `
         <button type="button" class="btn-action" data-action="memoryRecall" aria-label="Memory Recall">MR</button>
         <button type="button" class="btn-action" data-action="memorySubtract" aria-label="Memory Subtract">M-</button>
         <button type="button" class="btn-action" data-action="memoryAdd" aria-label="Memory Add">M+</button>
+
+        <button type="button" class="btn-action span-two" data-action="paren" data-value="(" aria-label="Open parenthesis">(</button>
+        <button type="button" class="btn-action span-two" data-action="paren" data-value=")" aria-label="Close parenthesis">)</button>
 
         <button type="button" class="btn-action" data-action="clear" aria-label="Clear Entry">C</button>
         <button type="button" class="btn-action" data-action="allClear" aria-label="All Clear">AC</button>
@@ -1025,6 +1044,11 @@ export class StayCalc extends HTMLElementBase {
     if (!action) return;
 
     switch (action) {
+      case "paren":
+        if (value === "(" || value === ")") {
+          this.engine.inputParenthesis(value);
+        }
+        break;
       case "digit":
         if (value !== undefined && value !== null) {
           this.engine.inputDigit(value);
@@ -1191,6 +1215,9 @@ export class StayCalc extends HTMLElementBase {
         event.preventDefault?.();
         this.executeAction("clear");
       }
+    } else if (key === "(" || key === ")") {
+      event.preventDefault?.();
+      this.executeAction("paren", key);
     } else if (key === ".") {
       event.preventDefault?.();
       if (this.isProgrammerOpen) {
@@ -1232,6 +1259,13 @@ export class StayCalc extends HTMLElementBase {
   }
 
   /**
+   * Returns current formula expression string from the underlying engine.
+   */
+  public getExpression(): string {
+    return this.engine.getExpression();
+  }
+
+  /**
    * Synchronizes the displayed value and status with the underlying CalcEngine state.
    */
   public updateDisplay(): void {
@@ -1246,6 +1280,12 @@ export class StayCalc extends HTMLElementBase {
           slottedDisplay.querySelector?.("[data-display-value]") || slottedDisplay;
         if (customValue) {
           customValue.textContent = displayVal;
+        }
+        const customExpr =
+          slottedDisplay.querySelector?.("[data-expression-display]") ||
+          slottedDisplay.querySelector?.("#expression-display");
+        if (customExpr) {
+          customExpr.textContent = state.expression;
         }
         if (state.isLocked) {
           slottedDisplay.classList?.add?.("error");
@@ -1273,6 +1313,11 @@ export class StayCalc extends HTMLElementBase {
       const valueEl = this.shadowRoot.getElementById("display-value");
       if (valueEl) {
         valueEl.textContent = displayVal;
+      }
+
+      const exprEl = this.shadowRoot.getElementById("expression-display");
+      if (exprEl) {
+        exprEl.textContent = state.expression;
       }
 
       const cardEl = this.shadowRoot.getElementById("display-card");
