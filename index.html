@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>StayCalc - Precision Web Calculator</title>
+  <style>
+    :root {
+      --calc-primary: #2563eb;
+      --calc-on-primary: #ffffff;
+      --calc-secondary: #475569;
+      --calc-tertiary: #f4f4f5;
+      --calc-background: #ffffff;
+      --calc-surface: #f4f4f5;
+      --calc-container-high: #ffffff;
+      --calc-container-medium: #f4f4f5;
+      --calc-container-low: #e4e4e7;
+      --calc-text-primary: #09090b;
+      --calc-text-secondary: #71717a;
+      --calc-outline-low: #e4e4e7;
+      --calc-info: #0a84ff;
+      --calc-success: #30d158;
+      --calc-warning: #ffd60a;
+      --calc-error: #ff453a;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--calc-background, #ffffff);
+      color: var(--calc-text-primary, #09090b);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 12px;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+      max-width: 380px;
+      width: 100%;
+    }
+
+    h1 {
+      font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      color: var(--calc-text-primary, #09090b);
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: var(--calc-text-secondary, #71717a);
+      line-height: 1.4;
+    }
+
+    main {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>StayCalc</h1>
+    <p class="subtitle">Precision multi-mode pocket calculator with accessible keyboard navigation</p>
+  </header>
+
+  <main>
+    <stay-calc></stay-calc>
+  </main>
+
+  <script type="module" src="./src/index.ts"></script>
+</body>
+</html>
