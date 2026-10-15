@@ -141,11 +141,153 @@ const STYLES = `
   .span-two {
     grid-column: span 2;
   }
+  .calc-top-bar {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .btn-history-toggle {
+    height: 32px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background-color: var(--calc-surface, #f4f4f5);
+    color: var(--calc-text-primary, #09090b);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.1s ease, transform 0.08s ease;
+  }
+  .btn-history-toggle:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+  }
+  .btn-history-toggle:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
+  .history-drawer {
+    display: none;
+    width: 100%;
+    max-width: 100%;
+    background: var(--calc-surface, #f4f4f5);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .history-drawer.open {
+    display: block;
+  }
+  .history-panel {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--calc-outline-low, #e4e4e7);
+    box-sizing: border-box;
+  }
+  .history-title {
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--calc-text-secondary, #71717a);
+  }
+  .btn-history-clear {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--calc-error, #ff453a);
+    border: 1px solid var(--calc-error, #ff453a);
+    cursor: pointer;
+  }
+  .btn-history-clear:hover {
+    background: rgba(255, 69, 58, 0.1);
+  }
+  .btn-history-clear:focus-visible {
+    outline: 2px solid var(--calc-error, #ff453a);
+    outline-offset: 2px;
+  }
+  .history-empty {
+    font-size: 13px;
+    color: var(--calc-text-secondary, #71717a);
+    text-align: center;
+    padding: 14px 0;
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .history-item {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--calc-background, #ffffff);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    color: var(--calc-text-primary, #09090b);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.1s ease;
+  }
+  .history-item:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+  }
+  .history-item:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
 `;
 
 const TEMPLATE_HTML = `
   <style>${STYLES}</style>
   <div class="calc-container" part="container">
+    <nav class="calc-top-bar" part="top-bar">
+      <button type="button" class="btn-history-toggle" id="history-toggle" part="history-toggle" data-action="toggleHistory" aria-expanded="false" aria-controls="history-drawer" aria-label="Toggle calculation history">History</button>
+    </nav>
+    <section class="history-drawer" id="history-drawer" part="history-drawer" aria-label="Calculation History" role="region">
+      <article class="history-panel" id="history-panel" part="history-panel">
+        <header class="history-header">
+          <span class="history-title">History</span>
+          <button type="button" class="btn-history-clear" id="history-clear" part="history-clear" data-action="clearHistory" aria-label="Clear calculation history">Clear History</button>
+        </header>
+        <p class="history-empty" id="history-empty" part="history-empty">No calculations yet</p>
+        <ul class="history-list" id="history-list" part="history-list" role="list"></ul>
+      </article>
+    </section>
     <slot name="display">
       <div class="display-card" id="display-card" part="display">
         <header class="display-header" part="header">
@@ -213,8 +355,12 @@ const HTMLElementBase =
 export class StayCalc extends HTMLElementBase {
   public engine: CalcEngine;
   private isConnectedToDOM: boolean = false;
+  private isHistoryOpen: boolean = false;
   private keydownListener: ((event: KeyboardEvent) => void) | null = null;
   private keypadClickListener: ((event: Event) => void) | null = null;
+  private historyClickListener: ((event: Event) => void) | null = null;
+  private historyToggleListener: ((event: Event) => void) | null = null;
+  private historyKeydownListener: ((event: KeyboardEvent) => void) | null = null;
 
   constructor() {
     super();
@@ -245,10 +391,51 @@ export class StayCalc extends HTMLElementBase {
         const target = (event.target as HTMLElement)?.closest?.("button");
         if (!target) return;
         const action = target.getAttribute("data-action");
-        const value = target.getAttribute("data-value");
+        const value = target.getAttribute("data-value") ?? target.getAttribute("data-index");
         this.executeAction(action, value);
       };
       keypadContainer.addEventListener("click", this.keypadClickListener);
+    }
+
+    // Attach click listener on history drawer (delegated for recall and clear)
+    const historyDrawer = this.shadowRoot?.getElementById("history-drawer");
+
+    if (historyDrawer) {
+      this.historyClickListener = (event: Event) => {
+        const target = (event.target as HTMLElement)?.closest?.("button");
+        if (!target) return;
+        const action = target.getAttribute("data-action");
+        const value = target.getAttribute("data-value") ?? target.getAttribute("data-index");
+        this.executeAction(action, value);
+      };
+      historyDrawer.addEventListener("click", this.historyClickListener);
+    }
+
+    // Attach click listener on history toggle button
+    const historyToggle = this.shadowRoot?.getElementById("history-toggle");
+    if (historyToggle) {
+      this.historyToggleListener = (_event: Event) => {
+        this.executeAction("toggleHistory");
+      };
+      historyToggle.addEventListener("click", this.historyToggleListener);
+    }
+
+    // Attach keydown listener on history drawer for Enter/Space recall
+    if (historyDrawer) {
+      this.historyKeydownListener = (event: KeyboardEvent) => {
+        const target = (event.target as HTMLElement)?.closest?.("button");
+        if (
+          target &&
+          target.getAttribute("data-action") === "recallHistory" &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault?.();
+          event.stopPropagation?.();
+          const index = target.getAttribute("data-index");
+          this.executeAction("recallHistory", index);
+        }
+      };
+      historyDrawer.addEventListener("keydown", this.historyKeydownListener);
     }
 
     // Attach global window keyboard listener
@@ -275,10 +462,58 @@ export class StayCalc extends HTMLElementBase {
       this.keypadClickListener = null;
     }
 
+    if (this.historyClickListener && this.shadowRoot) {
+      const historyDrawer = this.shadowRoot.getElementById("history-drawer");
+      historyDrawer?.removeEventListener("click", this.historyClickListener);
+      this.historyClickListener = null;
+    }
+
+    if (this.historyToggleListener && this.shadowRoot) {
+      const historyToggle = this.shadowRoot.getElementById("history-toggle");
+      historyToggle?.removeEventListener("click", this.historyToggleListener);
+      this.historyToggleListener = null;
+    }
+
+    if (this.historyKeydownListener && this.shadowRoot) {
+      const historyDrawer = this.shadowRoot.getElementById("history-drawer");
+      historyDrawer?.removeEventListener("keydown", this.historyKeydownListener);
+      this.historyKeydownListener = null;
+    }
+
     if (this.keydownListener && typeof window !== "undefined") {
       window.removeEventListener("keydown", this.keydownListener);
       this.keydownListener = null;
     }
+  }
+
+  /**
+   * Toggles the visibility of the calculation history drawer and synchronizes ARIA attributes.
+   */
+  public toggleHistory(): void {
+    this.isHistoryOpen = !this.isHistoryOpen;
+    if (this.shadowRoot) {
+      const drawer = this.shadowRoot.getElementById("history-drawer");
+      const toggle = this.shadowRoot.getElementById("history-toggle");
+      if (drawer) {
+        if (this.isHistoryOpen) {
+          drawer.classList.add("open");
+          drawer.style.display = "block";
+        } else {
+          drawer.classList.remove("open");
+          drawer.style.display = "none";
+        }
+      }
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", String(this.isHistoryOpen));
+      }
+    }
+  }
+
+  /**
+   * Returns true if the history drawer is currently open.
+   */
+  public getHistoryOpen(): boolean {
+    return this.isHistoryOpen;
   }
 
   /**
@@ -325,6 +560,17 @@ export class StayCalc extends HTMLElementBase {
       case "memoryClear":
         this.engine.memoryClear();
         break;
+      case "toggleHistory":
+        this.toggleHistory();
+        break;
+      case "recallHistory":
+        if (value !== undefined && value !== null) {
+          this.engine.recallHistory(Number(value));
+        }
+        break;
+      case "clearHistory":
+        this.engine.clearHistory();
+        break;
     }
 
     this.updateDisplay();
@@ -334,12 +580,30 @@ export class StayCalc extends HTMLElementBase {
    * Handles keyboard navigation and key mapping for physical keyboard typing.
    */
   public handleKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) {
+      return;
+    }
+
     // Preserve browser shortcuts (e.g. Ctrl+C, Cmd+R) per RULE-UI-004 & DEC-UI-01
     if (event.ctrlKey || event.metaKey || event.altKey) {
       return;
     }
 
     const key = event.key;
+
+    // Support Enter or Space on focused history item
+    const target = event.target as HTMLElement | null;
+    const historyItem = target?.closest?.("button");
+    if (
+      historyItem &&
+      historyItem.getAttribute("data-action") === "recallHistory" &&
+      (key === "Enter" || key === " ")
+    ) {
+      event.preventDefault?.();
+      const index = historyItem.getAttribute("data-index");
+      this.executeAction("recallHistory", index);
+      return;
+    }
 
     if (key >= "0" && key <= "9") {
       event.preventDefault?.();
@@ -435,6 +699,28 @@ export class StayCalc extends HTMLElementBase {
         } else {
           memoryBadge.classList.remove("active");
           memoryBadge.style.display = "none";
+        }
+      }
+
+      // 3. History Drawer synchronization
+      const historyList = this.shadowRoot.getElementById("history-list");
+      const historyEmpty = this.shadowRoot.getElementById("history-empty");
+      const history = this.engine.getHistory();
+
+      if (historyList && historyEmpty) {
+        if (history.length === 0) {
+          historyEmpty.style.display = "block";
+          historyList.style.display = "none";
+          historyList.innerHTML = "";
+        } else {
+          historyEmpty.style.display = "none";
+          historyList.style.display = "flex";
+          let itemsHtml = "";
+          for (let i = 0; i < history.length; i++) {
+            const entry = history[i];
+            itemsHtml += `<button type="button" class="history-item" data-action="recallHistory" data-index="${i}" role="button" tabindex="0" aria-label="Recall calculation ${entry.expression}">${entry.expression}</button>`;
+          }
+          historyList.innerHTML = itemsHtml;
         }
       }
     }

@@ -25,6 +25,8 @@ export interface CalcEngineState {
   memory: number;
   /** True if memory register contains a non-zero value */
   hasMemory: boolean;
+  /** Calculation history tape records (up to 50 entries) */
+  history: CalculationRecord[];
 }
 
 /**
@@ -36,4 +38,6 @@ export interface CalculationRecord {
   operand2: number;
   result: number;
   timestamp: number;
+  /** Formatted expression string (e.g. '2 + 3 = 5') */
+  expression: string;
 }

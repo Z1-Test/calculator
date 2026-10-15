@@ -748,4 +748,204 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       assert.equal(customBadge.style.display, "none");
     });
   });
+
+  describe("10. Calculation History Tape Drawer & Recall (CASE-HIST-09 to CASE-HIST-11)", () => {
+    it("should initialize with history drawer closed and empty message rendered", () => {
+      assert.equal(calc.getHistoryOpen(), false);
+      const drawer = calc.shadowRoot!.getElementById("history-drawer");
+      const toggle = calc.shadowRoot!.getElementById("history-toggle");
+      const empty = calc.shadowRoot!.getElementById("history-empty");
+
+      assert.ok(drawer && toggle && empty);
+      assert.equal(toggle.getAttribute("aria-expanded"), "false");
+      assert.equal(toggle.getAttribute("aria-controls"), "history-drawer");
+      assert.equal(toggle.getAttribute("aria-label"), "Toggle calculation history");
+      assert.equal(drawer.classList.contains("open"), false);
+      assert.equal(empty.textContent, "No calculations yet");
+    });
+
+    it("should toggle history drawer open and closed on #history-toggle button click (CASE-HIST-09)", () => {
+      const toggle = calc.shadowRoot!.getElementById("history-toggle");
+      const drawer = calc.shadowRoot!.getElementById("history-drawer");
+
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getHistoryOpen(), true);
+      assert.equal(drawer?.classList.contains("open"), true);
+      assert.equal(drawer?.style.display, "block");
+      assert.equal(toggle?.getAttribute("aria-expanded"), "true");
+
+      toggle?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getHistoryOpen(), false);
+      assert.equal(drawer?.classList.contains("open"), false);
+      assert.equal(drawer?.style.display, "none");
+      assert.equal(toggle?.getAttribute("aria-expanded"), "false");
+    });
+
+    it("should render history entries in #history-list after calculation", () => {
+      const btn2 = calc.shadowRoot!.querySelector('button[data-value="2"]');
+      const btnPlus = calc.shadowRoot!.querySelector('button[data-value="+"]');
+      const btn3 = calc.shadowRoot!.querySelector('button[data-value="3"]');
+      const btnEquals = calc.shadowRoot!.querySelector('button[data-action="calculate"]');
+
+      btn2?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnPlus?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn3?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnEquals?.dispatchEvent(new Event("click", { bubbles: true }));
+
+      assert.equal(calc.getDisplayValue(), "5");
+
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const historyEmpty = calc.shadowRoot!.getElementById("history-empty");
+      assert.equal(historyEmpty?.style.display, "none");
+
+      const items = historyList?.childNodes as MockElement[];
+      assert.equal(items.length, 1);
+      assert.equal(items[0].getAttribute("data-action"), "recallHistory");
+      assert.equal(items[0].getAttribute("data-index"), "0");
+      assert.equal(items[0].getAttribute("role"), "button");
+      assert.equal(items[0].getAttribute("tabindex"), "0");
+      assert.equal(items[0].textContent, "2 + 3 = 5");
+    });
+
+    it("should recall calculation result when history item button is clicked (CASE-HIST-05)", () => {
+      calc.executeAction("digit", "4");
+      calc.executeAction("operator", "*");
+      calc.executeAction("digit", "5");
+      calc.executeAction("calculate"); // 20
+
+      calc.executeAction("clear"); // Display resets to "0"
+      assert.equal(calc.getDisplayValue(), "0");
+
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const itemBtn = historyList?.childNodes[0] as MockElement;
+      assert.ok(itemBtn);
+
+      itemBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "20");
+
+      // Verify immediate chaining with subsequent operator
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "1");
+      calc.executeAction("digit", "0");
+      calc.executeAction("calculate");
+      assert.equal(calc.getDisplayValue(), "30");
+    });
+
+    it("should recall calculation result via keyboard Enter and Space keys (CASE-HIST-10)", () => {
+      calc.executeAction("digit", "7");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "8");
+      calc.executeAction("calculate"); // 15
+
+      calc.executeAction("clear");
+      assert.equal(calc.getDisplayValue(), "0");
+
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const itemBtn = historyList?.childNodes[0] as MockElement;
+      assert.ok(itemBtn);
+
+      // Trigger Enter keydown
+      const enterEvent = new MockKeyboardEvent("keydown", { key: "Enter", bubbles: true });
+      itemBtn.dispatchEvent(enterEvent);
+      assert.equal(calc.getDisplayValue(), "15");
+
+      calc.executeAction("clear");
+      assert.equal(calc.getDisplayValue(), "0");
+
+      // Trigger Space keydown
+      const spaceEvent = new MockKeyboardEvent("keydown", { key: " ", bubbles: true });
+      itemBtn.dispatchEvent(spaceEvent);
+      assert.equal(calc.getDisplayValue(), "15");
+    });
+
+    it("should clear history entries and restore empty state on #history-clear button click (CASE-HIST-08)", () => {
+      calc.executeAction("digit", "9");
+      calc.executeAction("operator", "*");
+      calc.executeAction("digit", "9");
+      calc.executeAction("calculate"); // 81
+
+      assert.equal(calc.engine.getHistory().length, 1);
+
+      const clearBtn = calc.shadowRoot!.getElementById("history-clear");
+      clearBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+
+      assert.equal(calc.engine.getHistory().length, 0);
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const historyEmpty = calc.shadowRoot!.getElementById("history-empty");
+
+      assert.equal(historyList?.childNodes.length, 0);
+      assert.equal(historyEmpty?.style.display, "block");
+    });
+
+    it("should dispatch history actions exactly once without duplicate bubbling dispatches", () => {
+      calc.executeAction("digit", "5");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "5");
+      calc.executeAction("calculate"); // 10
+
+      const historyList = calc.shadowRoot!.getElementById("history-list");
+      const itemBtn = historyList?.childNodes[0] as MockElement;
+      assert.ok(itemBtn);
+
+      const historyCalls: string[] = [];
+      const originalExecuteAction = calc.executeAction.bind(calc);
+      calc.executeAction = (action, val) => {
+        historyCalls.push(`${action}:${val}`);
+        return originalExecuteAction(action, val);
+      };
+
+      // Item click must fire once
+      itemBtn.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "recallHistory:0");
+
+      historyCalls.length = 0;
+      // Item keydown Enter must fire once
+      const enterEvent = new MockKeyboardEvent("keydown", { key: "Enter", bubbles: true });
+      itemBtn.dispatchEvent(enterEvent);
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "recallHistory:0");
+
+      historyCalls.length = 0;
+      // Clear history click must fire once
+      const clearBtn = calc.shadowRoot!.getElementById("history-clear");
+      clearBtn?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(historyCalls.length, 1);
+      assert.equal(historyCalls[0], "clearHistory:null");
+    });
+
+    it("should preserve history across Clear Entry (C) and All Clear (AC) button clicks", () => {
+      calc.executeAction("digit", "6");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "6");
+      calc.executeAction("calculate"); // 12
+
+      assert.equal(calc.engine.getHistory().length, 1);
+
+      const btnC = calc.shadowRoot!.querySelector('button[data-action="clear"]');
+      const btnAC = calc.shadowRoot!.querySelector('button[data-action="allClear"]');
+
+      btnC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0");
+      assert.equal(calc.engine.getHistory().length, 1);
+
+      btnAC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0");
+      assert.equal(calc.engine.getHistory().length, 1);
+    });
+
+    it("should enforce mobile zero-overflow and layout boundaries on drawer and items (CASE-HIST-11)", () => {
+      const styleEl = calc.shadowRoot!.querySelector("style");
+      assert.ok(styleEl);
+      const css = styleEl.textContent;
+
+      assert.ok(css.includes(".history-drawer"));
+      assert.ok(css.includes("max-width: 100%"));
+      assert.ok(css.includes("overflow-x: hidden"));
+      assert.ok(css.includes("overflow-y: auto"));
+      assert.ok(css.includes("word-break: break-all"));
+      assert.ok(css.includes("overflow-wrap: break-word"));
+      assert.ok(!css.includes("!important"), "Strictly zero !important across stylesheets");
+    });
+  });
 });

@@ -19,7 +19,7 @@ sources:
 - **`RULE-CALC-002` (Precision Normalization)**: All floating-point operations in Standard and Scientific modes must truncate IEEE-754 representation noise to a maximum of 12 significant decimal digits (e.g., `0.1 + 0.2` must display `0.3`).
 - **`RULE-CALC-003` (Trigonometric Angle Mode)**: Scientific trigonometric functions (`sin`, `cos`, `tan`) must respect the active angle unit mode (`DEG` by default, togglable to `RAD`).
 - **`RULE-CALC-004` (Radix Integer Clamping)**: Programmer mode calculations must use BigInt integer arithmetic clamped to the selected bit-width word size (BYTE: 8-bit, WORD: 16-bit, DWORD: 32-bit, QWORD: 64-bit) with two's complement sign representation.
-- **`RULE-CALC-005` (History Tape Cap)**: The local history tape must retain a maximum of 100 entries. When the limit is reached, the oldest entries must be automatically pruned (FIFO).
+- **`RULE-CALC-005` (History Tape Cap)**: The local history tape must retain a maximum of 50 entries. When the limit is reached, the oldest entries must be automatically pruned (FIFO).
 - **`RULE-CALC-006` (Memory Register Persistence)**: Memory register values must persist across mode switches (e.g., switching between Standard and Scientific) within the same session.
 
 ## 2. Security & Execution Invariants
