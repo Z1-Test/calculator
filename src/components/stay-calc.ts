@@ -36,6 +36,30 @@ const STYLES = `
     margin-bottom: 14px;
     box-sizing: border-box;
   }
+  .display-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 18px;
+    margin-bottom: 4px;
+    box-sizing: border-box;
+  }
+  .memory-badge {
+    display: none;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--calc-primary, #2563eb);
+    background: var(--calc-container-low, #e4e4e7);
+    border-radius: 4px;
+    padding: 2px 6px;
+    letter-spacing: 0.05em;
+  }
+  .memory-badge.active {
+    display: inline-block;
+  }
   .display-status {
     font-size: 12px;
     font-weight: 500;
@@ -43,7 +67,7 @@ const STYLES = `
     min-height: 16px;
     line-height: 1.33;
     text-align: right;
-    width: 100%;
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -124,12 +148,20 @@ const TEMPLATE_HTML = `
   <div class="calc-container" part="container">
     <slot name="display">
       <div class="display-card" id="display-card" part="display">
-        <div class="display-status" id="display-status" part="status"></div>
+        <header class="display-header" part="header">
+          <span class="memory-badge" id="memory-badge" part="memory-badge" aria-label="Memory Active" style="display: none;">M</span>
+          <span class="display-status" id="display-status" part="status"></span>
+        </header>
         <div class="display-value" id="display-value" part="value">0</div>
       </div>
     </slot>
     <slot name="keypad">
       <div class="keypad-grid" id="keypad-grid" part="keypad">
+        <button type="button" class="btn-action" data-action="memoryClear" aria-label="Memory Clear">MC</button>
+        <button type="button" class="btn-action" data-action="memoryRecall" aria-label="Memory Recall">MR</button>
+        <button type="button" class="btn-action" data-action="memorySubtract" aria-label="Memory Subtract">M-</button>
+        <button type="button" class="btn-action" data-action="memoryAdd" aria-label="Memory Add">M+</button>
+
         <button type="button" class="btn-action" data-action="clear" aria-label="Clear Entry">C</button>
         <button type="button" class="btn-action" data-action="allClear" aria-label="All Clear">AC</button>
         <button type="button" class="btn-action" data-action="backspace" aria-label="Backspace">⌫</button>
@@ -281,6 +313,18 @@ export class StayCalc extends HTMLElementBase {
       case "backspace":
         this.engine.backspace();
         break;
+      case "memoryAdd":
+        this.engine.memoryAdd();
+        break;
+      case "memorySubtract":
+        this.engine.memorySubtract();
+        break;
+      case "memoryRecall":
+        this.engine.memoryRecall();
+        break;
+      case "memoryClear":
+        this.engine.memoryClear();
+        break;
     }
 
     this.updateDisplay();
@@ -342,6 +386,19 @@ export class StayCalc extends HTMLElementBase {
         } else {
           slottedDisplay.classList?.remove?.("error");
         }
+
+        const slottedBadge =
+          slottedDisplay.querySelector?.("[data-memory-badge]") ||
+          slottedDisplay.querySelector?.("#memory-badge");
+        if (slottedBadge) {
+          if (state.hasMemory) {
+            slottedBadge.classList?.add?.("active");
+            if (slottedBadge.style) slottedBadge.style.display = "inline-block";
+          } else {
+            slottedBadge.classList?.remove?.("active");
+            if (slottedBadge.style) slottedBadge.style.display = "none";
+          }
+        }
       }
     }
 
@@ -367,6 +424,17 @@ export class StayCalc extends HTMLElementBase {
           statusEl.textContent = `${state.accumulator} ${state.pendingOperator}`;
         } else {
           statusEl.textContent = "";
+        }
+      }
+
+      const memoryBadge = this.shadowRoot.getElementById("memory-badge");
+      if (memoryBadge) {
+        if (state.hasMemory) {
+          memoryBadge.classList.add("active");
+          memoryBadge.style.display = "inline-block";
+        } else {
+          memoryBadge.classList.remove("active");
+          memoryBadge.style.display = "none";
         }
       }
     }

@@ -551,6 +551,18 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
 
       const allClearBtn = calc.shadowRoot!.querySelector('button[data-action="allClear"]');
       assert.equal(allClearBtn?.getAttribute("aria-label"), "All Clear");
+
+      const mcBtn = calc.shadowRoot!.querySelector('button[data-action="memoryClear"]');
+      assert.equal(mcBtn?.getAttribute("aria-label"), "Memory Clear");
+
+      const mrBtn = calc.shadowRoot!.querySelector('button[data-action="memoryRecall"]');
+      assert.equal(mrBtn?.getAttribute("aria-label"), "Memory Recall");
+
+      const mSubBtn = calc.shadowRoot!.querySelector('button[data-action="memorySubtract"]');
+      assert.equal(mSubBtn?.getAttribute("aria-label"), "Memory Subtract");
+
+      const mAddBtn = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      assert.equal(mAddBtn?.getAttribute("aria-label"), "Memory Add");
     });
 
     it("should enforce tactile pill shape (border-radius: 9999px) on all buttons", () => {
@@ -591,6 +603,149 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
 
       assert.equal(calc.getDisplayValue(), "50");
+    });
+  });
+
+  describe("9. Memory Registers & Reactive Status Badge (CASE-MEM-01, CASE-MEM-09, CASE-MEM-10)", () => {
+    it("should initialize with memory badge hidden and not active", () => {
+      const badge = calc.shadowRoot!.getElementById("memory-badge");
+      assert.ok(badge, "Memory badge must exist in shadow root");
+      assert.equal(badge.style.display, "none");
+      assert.equal(badge.classList.contains("active"), false);
+      assert.equal(calc.engine.hasMemory(), false);
+    });
+
+    it("should activate memory badge when M+ button is clicked with non-zero value", () => {
+      const btn4 = calc.shadowRoot!.querySelector('button[data-value="4"]');
+      const btn2 = calc.shadowRoot!.querySelector('button[data-value="2"]');
+      const btnMAdd = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      const badge = calc.shadowRoot!.getElementById("memory-badge");
+
+      btn4?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn2?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "42");
+
+      btnMAdd?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getMemoryValue(), 42);
+      assert.equal(calc.engine.hasMemory(), true);
+      assert.equal(badge?.style.display, "inline-block");
+      assert.equal(badge?.classList.contains("active"), true);
+      assert.equal(calc.getDisplayValue(), "42");
+    });
+
+    it("should deactivate memory badge when M- button reduces memory to 0", () => {
+      const btn5 = calc.shadowRoot!.querySelector('button[data-value="5"]');
+      const btn0 = calc.shadowRoot!.querySelector('button[data-value="0"]');
+      const btnMAdd = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      const btnMSub = calc.shadowRoot!.querySelector('button[data-action="memorySubtract"]');
+      const badge = calc.shadowRoot!.getElementById("memory-badge");
+
+      btn5?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn0?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMAdd?.dispatchEvent(new Event("click", { bubbles: true })); // memory = 50
+      assert.equal(badge?.classList.contains("active"), true);
+
+      // Subtract 50
+      btnMSub?.dispatchEvent(new Event("click", { bubbles: true })); // memory = 0
+      assert.equal(calc.engine.getMemoryValue(), 0);
+      assert.equal(calc.engine.hasMemory(), false);
+      assert.equal(badge?.style.display, "none");
+      assert.equal(badge?.classList.contains("active"), false);
+    });
+
+    it("should recall memory via MR button and allow chained calculations", () => {
+      const btn3 = calc.shadowRoot!.querySelector('button[data-value="3"]');
+      const btn0 = calc.shadowRoot!.querySelector('button[data-value="0"]');
+      const btnMAdd = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      const btnMR = calc.shadowRoot!.querySelector('button[data-action="memoryRecall"]');
+      const btnPlus = calc.shadowRoot!.querySelector('button[data-value="+"]');
+      const btn5 = calc.shadowRoot!.querySelector('button[data-value="5"]');
+      const btnEquals = calc.shadowRoot!.querySelector('button[data-action="calculate"]');
+      const btnC = calc.shadowRoot!.querySelector('button[data-action="clear"]');
+
+      // Add 30 to memory
+      btn3?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn0?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMAdd?.dispatchEvent(new Event("click", { bubbles: true })); // memory = 30
+
+      // Clear active buffer
+      btnC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0");
+
+      // Chained operation: 5 + MR =
+      btn5?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnPlus?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMR?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "30");
+
+      btnEquals?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "35");
+    });
+
+    it("should reset memory and hide badge on MC button click", () => {
+      const btn9 = calc.shadowRoot!.querySelector('button[data-value="9"]');
+      const btnMAdd = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      const btnMC = calc.shadowRoot!.querySelector('button[data-action="memoryClear"]');
+      const badge = calc.shadowRoot!.getElementById("memory-badge");
+
+      btn9?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMAdd?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(badge?.classList.contains("active"), true);
+
+      btnMC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.engine.getMemoryValue(), 0);
+      assert.equal(calc.engine.hasMemory(), false);
+      assert.equal(badge?.style.display, "none");
+      assert.equal(badge?.classList.contains("active"), false);
+    });
+
+    it("should preserve memory register and badge visibility across C and AC clicks", () => {
+      const btn7 = calc.shadowRoot!.querySelector('button[data-value="7"]');
+      const btnMAdd = calc.shadowRoot!.querySelector('button[data-action="memoryAdd"]');
+      const btnC = calc.shadowRoot!.querySelector('button[data-action="clear"]');
+      const btnAC = calc.shadowRoot!.querySelector('button[data-action="allClear"]');
+      const badge = calc.shadowRoot!.getElementById("memory-badge");
+
+      btn7?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMAdd?.dispatchEvent(new Event("click", { bubbles: true })); // memory = 7
+      assert.equal(badge?.classList.contains("active"), true);
+
+      // Press C
+      btnC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0");
+      assert.equal(calc.engine.getMemoryValue(), 7);
+      assert.equal(badge?.classList.contains("active"), true);
+      assert.equal(badge?.style.display, "inline-block");
+
+      // Press AC
+      btnAC?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "0");
+      assert.equal(calc.engine.getMemoryValue(), 7);
+      assert.equal(badge?.classList.contains("active"), true);
+      assert.equal(badge?.style.display, "inline-block");
+    });
+
+    it("should synchronize memory badge in slotted custom display", () => {
+      const slottedDiv = new MockElement("DIV");
+      slottedDiv.setAttribute("slot", "display");
+      const customValue = new MockElement("SPAN");
+      customValue.setAttribute("data-display-value", "true");
+      const customBadge = new MockElement("SPAN");
+      customBadge.setAttribute("data-memory-badge", "true");
+      slottedDiv.appendChild(customBadge);
+      slottedDiv.appendChild(customValue);
+
+      calc.appendChild(slottedDiv);
+
+      calc.executeAction("digit", "8");
+      calc.executeAction("memoryAdd");
+
+      assert.equal(customBadge.classList.contains("active"), true);
+      assert.equal(customBadge.style.display, "inline-block");
+
+      calc.executeAction("memoryClear");
+      assert.equal(customBadge.classList.contains("active"), false);
+      assert.equal(customBadge.style.display, "none");
     });
   });
 });
