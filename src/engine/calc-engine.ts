@@ -748,6 +748,21 @@ export class CalcEngine {
   }
 
   /**
+   * Cycles word size (64 -> 32 -> 16 -> 8 -> 64) and returns the updated word size.
+   */
+  public cycleWordSize(): WordSize {
+    const cycleMap: Record<WordSize, WordSize> = {
+      64: 32,
+      32: 16,
+      16: 8,
+      8: 64,
+    };
+    const next = cycleMap[this.wordSize] || 64;
+    this.setWordSize(next);
+    return next;
+  }
+
+  /**
    * Returns true if Programmer Mode is active.
    */
   public isProgrammerModeActive(): boolean {

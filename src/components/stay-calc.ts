@@ -1,5 +1,5 @@
 import { CalcEngine } from "../engine/calc-engine.ts";
-import type { CalcEngineState, Operator } from "../engine/types.ts";
+import type { CalcEngineState, Operator, RadixBase, WordSize } from "../engine/types.ts";
 
 const STYLES = `
   :host {
@@ -151,7 +151,8 @@ const STYLES = `
     box-sizing: border-box;
   }
   .btn-history-toggle,
-  .btn-scientific-toggle {
+  .btn-scientific-toggle,
+  .btn-programmer-toggle {
     height: 32px;
     padding: 0 14px;
     font-size: 13px;
@@ -167,18 +168,196 @@ const STYLES = `
     transition: background-color 0.1s ease, transform 0.08s ease;
   }
   .btn-history-toggle:hover,
-  .btn-scientific-toggle:hover {
+  .btn-scientific-toggle:hover,
+  .btn-programmer-toggle:hover {
     background-color: var(--calc-container-low, #e4e4e7);
   }
   .btn-history-toggle:focus-visible,
-  .btn-scientific-toggle:focus-visible {
+  .btn-scientific-toggle:focus-visible,
+  .btn-programmer-toggle:focus-visible {
     outline: 2px solid var(--calc-primary, #2563eb);
     outline-offset: 2px;
   }
-  .btn-scientific-toggle.active {
+  .btn-scientific-toggle.active,
+  .btn-programmer-toggle.active {
     background-color: var(--calc-primary, #2563eb);
     color: var(--calc-on-primary, #ffffff);
     border-color: var(--calc-primary, #2563eb);
+  }
+  .programmer-panel {
+    display: none;
+    width: 100%;
+    max-width: 100%;
+    background: var(--calc-surface, #f4f4f5);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    border-radius: 16px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  .programmer-panel.open {
+    display: block;
+  }
+  .radix-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .radix-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    background: var(--calc-background, #ffffff);
+    color: var(--calc-text-primary, #09090b);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    box-sizing: border-box;
+    transition: background-color 0.1s ease, border-color 0.1s ease;
+  }
+  .radix-row:hover {
+    background-color: var(--calc-container-low, #e4e4e7);
+  }
+  .radix-row.active {
+    border-color: var(--calc-primary, #2563eb);
+    background-color: var(--calc-surface, #f4f4f5);
+    font-weight: 700;
+  }
+  .radix-row:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 1px;
+  }
+  .radix-label {
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--calc-text-secondary, #71717a);
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .radix-row.active .radix-label {
+    color: var(--calc-primary, #2563eb);
+  }
+  .radix-value {
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    flex: 1;
+    min-width: 0;
+  }
+  .programmer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .btn-word-size {
+    height: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: var(--calc-surface, #f4f4f5);
+    color: var(--calc-text-primary, #09090b);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.1s ease;
+    box-sizing: border-box;
+  }
+  .btn-word-size:hover {
+    background: var(--calc-container-low, #e4e4e7);
+  }
+  .btn-word-size:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
+  .bitwise-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .btn-bitwise {
+    height: 32px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: var(--calc-background, #ffffff);
+    color: var(--calc-text-primary, #09090b);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    min-width: 0;
+    transition: background-color 0.1s ease, transform 0.08s ease;
+    box-sizing: border-box;
+  }
+  .btn-bitwise:hover {
+    background: var(--calc-container-low, #e4e4e7);
+  }
+  .btn-bitwise:active {
+    transform: scale(0.96);
+  }
+  .btn-bitwise:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
+  .hex-keypad-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .btn-hex {
+    height: 36px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: var(--calc-background, #ffffff);
+    color: var(--calc-text-primary, #09090b);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    min-width: 0;
+    transition: background-color 0.1s ease, transform 0.08s ease;
+    box-sizing: border-box;
+  }
+  .btn-hex:hover:not(:disabled) {
+    background: var(--calc-container-low, #e4e4e7);
+  }
+  .btn-hex:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .btn-hex:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
+  }
+  button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
   .scientific-keypad {
     display: none;
@@ -340,6 +519,7 @@ const TEMPLATE_HTML = `
     <nav class="calc-top-bar" part="top-bar">
       <button type="button" class="btn-history-toggle" id="history-toggle" part="history-toggle" data-action="toggleHistory" aria-expanded="false" aria-controls="history-drawer" aria-label="Toggle calculation history">History</button>
       <button type="button" class="btn-scientific-toggle" id="scientific-toggle" part="scientific-toggle" data-action="toggleScientific" aria-expanded="false" aria-controls="scientific-keypad" aria-label="Toggle scientific mode">Scientific</button>
+      <button type="button" class="btn-programmer-toggle" id="programmer-toggle" part="programmer-toggle" data-action="toggleProgrammer" aria-expanded="false" aria-controls="programmer-panel" aria-label="Toggle programmer mode">Programmer</button>
     </nav>
     <section class="history-drawer" id="history-drawer" part="history-drawer" aria-label="Calculation History" role="region">
       <article class="history-panel" id="history-panel" part="history-panel">
@@ -360,6 +540,45 @@ const TEMPLATE_HTML = `
         <div class="display-value" id="display-value" part="value">0</div>
       </div>
     </slot>
+    <section class="programmer-panel" id="programmer-panel" part="programmer-panel" aria-label="Programmer Panel" role="region">
+      <div class="radix-panel" id="radix-panel" part="radix-panel" role="radiogroup" aria-label="Radix base selection">
+        <button type="button" class="radix-row" data-action="setRadix" data-value="HEX" role="radio" aria-checked="false" aria-label="Hexadecimal representation">
+          <span class="radix-label">HEX</span>
+          <span class="radix-value" id="radix-val-hex">0</span>
+        </button>
+        <button type="button" class="radix-row active" data-action="setRadix" data-value="DEC" role="radio" aria-checked="true" aria-label="Decimal representation">
+          <span class="radix-label">DEC</span>
+          <span class="radix-value" id="radix-val-dec">0</span>
+        </button>
+        <button type="button" class="radix-row" data-action="setRadix" data-value="OCT" role="radio" aria-checked="false" aria-label="Octal representation">
+          <span class="radix-label">OCT</span>
+          <span class="radix-value" id="radix-val-oct">0</span>
+        </button>
+        <button type="button" class="radix-row" data-action="setRadix" data-value="BIN" role="radio" aria-checked="false" aria-label="Binary representation">
+          <span class="radix-label">BIN</span>
+          <span class="radix-value" id="radix-val-bin">0</span>
+        </button>
+      </div>
+      <div class="programmer-controls" part="programmer-controls">
+        <button type="button" class="btn-word-size" id="word-size-toggle" part="word-size-toggle" data-action="cycleWordSize" aria-label="Word size toggle">QWORD (64-bit)</button>
+        <div class="bitwise-grid" part="bitwise-grid">
+          <button type="button" class="btn-bitwise" data-action="bitwiseAnd" aria-label="Bitwise AND">AND</button>
+          <button type="button" class="btn-bitwise" data-action="bitwiseOr" aria-label="Bitwise OR">OR</button>
+          <button type="button" class="btn-bitwise" data-action="bitwiseXor" aria-label="Bitwise XOR">XOR</button>
+          <button type="button" class="btn-bitwise" data-action="bitwiseNot" aria-label="Bitwise NOT">NOT</button>
+          <button type="button" class="btn-bitwise" data-action="bitwiseLsh" aria-label="Bitwise Left Shift">LSH</button>
+          <button type="button" class="btn-bitwise" data-action="bitwiseRsh" aria-label="Bitwise Right Shift">RSH</button>
+        </div>
+      </div>
+      <div class="hex-keypad-grid" id="hex-keypad-grid" part="hex-keypad">
+        <button type="button" class="btn-hex" data-action="digit" data-value="A" aria-label="Hex digit A" disabled>A</button>
+        <button type="button" class="btn-hex" data-action="digit" data-value="B" aria-label="Hex digit B" disabled>B</button>
+        <button type="button" class="btn-hex" data-action="digit" data-value="C" aria-label="Hex digit C" disabled>C</button>
+        <button type="button" class="btn-hex" data-action="digit" data-value="D" aria-label="Hex digit D" disabled>D</button>
+        <button type="button" class="btn-hex" data-action="digit" data-value="E" aria-label="Hex digit E" disabled>E</button>
+        <button type="button" class="btn-hex" data-action="digit" data-value="F" aria-label="Hex digit F" disabled>F</button>
+      </div>
+    </section>
     <section class="scientific-keypad" id="scientific-keypad" part="scientific-keypad" aria-label="Scientific Keypad" role="region">
       <div class="scientific-grid" id="scientific-grid" part="scientific-grid">
         <button type="button" class="btn-scientific btn-angle" id="angle-mode-toggle" part="angle-mode-toggle" data-action="toggleAngleMode" aria-label="Toggle angle mode DEG or RAD">DEG</button>
@@ -436,6 +655,7 @@ export class StayCalc extends HTMLElementBase {
   private isConnectedToDOM: boolean = false;
   private isHistoryOpen: boolean = false;
   private isScientificOpen: boolean = false;
+  private isProgrammerOpen: boolean = false;
   private keydownListener: ((event: KeyboardEvent) => void) | null = null;
   private keypadClickListener: ((event: Event) => void) | null = null;
   private historyClickListener: ((event: Event) => void) | null = null;
@@ -443,6 +663,8 @@ export class StayCalc extends HTMLElementBase {
   private historyKeydownListener: ((event: KeyboardEvent) => void) | null = null;
   private scientificClickListener: ((event: Event) => void) | null = null;
   private scientificToggleListener: ((event: Event) => void) | null = null;
+  private programmerClickListener: ((event: Event) => void) | null = null;
+  private programmerToggleListener: ((event: Event) => void) | null = null;
 
   constructor() {
     super();
@@ -524,6 +746,28 @@ export class StayCalc extends HTMLElementBase {
       scientificToggle.addEventListener("click", this.scientificToggleListener);
     }
 
+    // Attach click listener on programmer panel (delegated)
+    const programmerPanel = this.shadowRoot?.getElementById("programmer-panel");
+    if (programmerPanel) {
+      this.programmerClickListener = (event: Event) => {
+        const target = (event.target as HTMLElement)?.closest?.("button");
+        if (!target) return;
+        const action = target.getAttribute("data-action");
+        const value = target.getAttribute("data-value");
+        this.executeAction(action, value);
+      };
+      programmerPanel.addEventListener("click", this.programmerClickListener);
+    }
+
+    // Attach click listener on programmer toggle button
+    const programmerToggle = this.shadowRoot?.getElementById("programmer-toggle");
+    if (programmerToggle) {
+      this.programmerToggleListener = (_event: Event) => {
+        this.executeAction("toggleProgrammer");
+      };
+      programmerToggle.addEventListener("click", this.programmerToggleListener);
+    }
+
     // Attach keydown listener on history drawer for Enter/Space recall
     if (historyDrawer) {
       this.historyKeydownListener = (event: KeyboardEvent) => {
@@ -588,6 +832,18 @@ export class StayCalc extends HTMLElementBase {
       const scientificToggle = this.shadowRoot.getElementById("scientific-toggle");
       scientificToggle?.removeEventListener("click", this.scientificToggleListener);
       this.scientificToggleListener = null;
+    }
+
+    if (this.programmerClickListener && this.shadowRoot) {
+      const programmerPanel = this.shadowRoot.getElementById("programmer-panel");
+      programmerPanel?.removeEventListener("click", this.programmerClickListener);
+      this.programmerClickListener = null;
+    }
+
+    if (this.programmerToggleListener && this.shadowRoot) {
+      const programmerToggle = this.shadowRoot.getElementById("programmer-toggle");
+      programmerToggle?.removeEventListener("click", this.programmerToggleListener);
+      this.programmerToggleListener = null;
     }
 
     if (this.historyKeydownListener && this.shadowRoot) {
@@ -677,8 +933,88 @@ export class StayCalc extends HTMLElementBase {
   /**
    * Toggles the angle mode (DEG <-> RAD) and updates display.
    */
+  /**
+   * Toggles the angle mode (DEG <-> RAD) and updates display.
+   */
   public toggleAngleMode(): void {
     this.engine.toggleAngleMode();
+    this.updateDisplay();
+  }
+
+  /**
+   * Toggles the visibility of the programmer panel and synchronizes ARIA attributes.
+   */
+  public toggleProgrammer(): void {
+    this.isProgrammerOpen = !this.isProgrammerOpen;
+    this.engine.setProgrammerMode(this.isProgrammerOpen);
+    if (this.shadowRoot) {
+      const panel = this.shadowRoot.getElementById("programmer-panel");
+      const toggle = this.shadowRoot.getElementById("programmer-toggle");
+      if (panel) {
+        if (this.isProgrammerOpen) {
+          panel.classList.add("open");
+          panel.style.display = "block";
+        } else {
+          panel.classList.remove("open");
+          panel.style.display = "none";
+        }
+      }
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", String(this.isProgrammerOpen));
+        if (this.isProgrammerOpen) {
+          toggle.classList.add("active");
+        } else {
+          toggle.classList.remove("active");
+        }
+      }
+    }
+    this.updateDisplay();
+  }
+
+  /**
+   * Returns true if the programmer panel is currently open.
+   */
+  public getProgrammerOpen(): boolean {
+    return this.isProgrammerOpen;
+  }
+
+  /**
+   * Alias for getProgrammerOpen().
+   */
+  public isProgrammerPanelOpen(): boolean {
+    return this.isProgrammerOpen;
+  }
+
+  /**
+   * Sets programmer mode explicitly.
+   */
+  public setProgrammerMode(enabled: boolean): void {
+    if (this.isProgrammerOpen !== enabled) {
+      this.toggleProgrammer();
+    }
+  }
+
+  /**
+   * Cycles word size (QWORD 64 -> DWORD 32 -> WORD 16 -> BYTE 8 -> QWORD 64) and updates display.
+   */
+  public cycleWordSize(): void {
+    this.engine.cycleWordSize();
+    this.updateDisplay();
+  }
+
+  /**
+   * Sets word size directly.
+   */
+  public setWordSize(size: WordSize): void {
+    this.engine.setWordSize(size);
+    this.updateDisplay();
+  }
+
+  /**
+   * Sets active radix base (HEX, DEC, OCT, BIN).
+   */
+  public setRadix(radix: RadixBase): void {
+    this.engine.setRadix(radix);
     this.updateDisplay();
   }
 
@@ -772,6 +1108,35 @@ export class StayCalc extends HTMLElementBase {
           this.engine.inputConstant(value);
         }
         break;
+      case "toggleProgrammer":
+        this.toggleProgrammer();
+        break;
+      case "setRadix":
+        if (value) {
+          this.setRadix(value as RadixBase);
+        }
+        break;
+      case "cycleWordSize":
+        this.cycleWordSize();
+        break;
+      case "bitwiseAnd":
+        this.engine.bitwiseAnd();
+        break;
+      case "bitwiseOr":
+        this.engine.bitwiseOr();
+        break;
+      case "bitwiseXor":
+        this.engine.bitwiseXor();
+        break;
+      case "bitwiseNot":
+        this.engine.bitwiseNot();
+        break;
+      case "bitwiseLsh":
+        this.engine.bitwiseLsh();
+        break;
+      case "bitwiseRsh":
+        this.engine.bitwiseRsh();
+        break;
     }
 
     this.updateDisplay();
@@ -808,11 +1173,47 @@ export class StayCalc extends HTMLElementBase {
 
     if (key >= "0" && key <= "9") {
       event.preventDefault?.();
+      if (this.isProgrammerOpen) {
+        const radix = this.engine.getRadix();
+        if (radix === "BIN" && key > "1") {
+          return;
+        }
+        if (radix === "OCT" && key > "7") {
+          return;
+        }
+      }
       this.executeAction("digit", key);
+    } else if (key.length === 1 && /^[a-fA-F]$/.test(key)) {
+      if (this.isProgrammerOpen && this.engine.getRadix() === "HEX") {
+        event.preventDefault?.();
+        this.executeAction("digit", key.toUpperCase());
+      } else if (key === "c" || key === "C") {
+        event.preventDefault?.();
+        this.executeAction("clear");
+      }
     } else if (key === ".") {
       event.preventDefault?.();
+      if (this.isProgrammerOpen) {
+        return; // Gated out in programmer mode per RULE-PROG-003
+      }
       this.executeAction("decimal");
-    } else if (key === "+" || key === "-" || key === "*" || key === "/" || key === "^") {
+    } else if (key === "&" && this.isProgrammerOpen) {
+      event.preventDefault?.();
+      this.executeAction("bitwiseAnd");
+    } else if (key === "|" && this.isProgrammerOpen) {
+      event.preventDefault?.();
+      this.executeAction("bitwiseOr");
+    } else if (key === "~" && this.isProgrammerOpen) {
+      event.preventDefault?.();
+      this.executeAction("bitwiseNot");
+    } else if (key === "^") {
+      event.preventDefault?.();
+      if (this.isProgrammerOpen) {
+        this.executeAction("bitwiseXor");
+      } else {
+        this.executeAction("operator", "^");
+      }
+    } else if (key === "+" || key === "-" || key === "*" || key === "/") {
       event.preventDefault?.();
       this.executeAction("operator", key);
     } else if (key === "Enter" || key === "=") {
@@ -928,6 +1329,68 @@ export class StayCalc extends HTMLElementBase {
             itemsHtml += `<button type="button" class="history-item" data-action="recallHistory" data-index="${i}" role="button" tabindex="0" aria-label="Recall calculation ${entry.expression}">${entry.expression}</button>`;
           }
           historyList.innerHTML = itemsHtml;
+        }
+      }
+
+      // 4. Programmer Panel synchronization
+      const hexValEl = this.shadowRoot.getElementById("radix-val-hex");
+      if (hexValEl) hexValEl.textContent = state.multiRadix.hex;
+      const decValEl = this.shadowRoot.getElementById("radix-val-dec");
+      if (decValEl) decValEl.textContent = state.multiRadix.dec;
+      const octValEl = this.shadowRoot.getElementById("radix-val-oct");
+      if (octValEl) octValEl.textContent = state.multiRadix.oct;
+      const binValEl = this.shadowRoot.getElementById("radix-val-bin");
+      if (binValEl) binValEl.textContent = state.multiRadix.bin;
+
+      const radixRows = this.shadowRoot.querySelectorAll(".radix-row");
+      radixRows.forEach((row) => {
+        const rowRadix = row.getAttribute("data-value");
+        if (rowRadix === state.radix) {
+          row.classList.add("active");
+          row.setAttribute("aria-checked", "true");
+        } else {
+          row.classList.remove("active");
+          row.setAttribute("aria-checked", "false");
+        }
+      });
+
+      const wordSizeBtn = this.shadowRoot.getElementById("word-size-toggle");
+      if (wordSizeBtn) {
+        const labels: Record<WordSize, string> = {
+          64: "QWORD (64-bit)",
+          32: "DWORD (32-bit)",
+          16: "WORD (16-bit)",
+          8: "BYTE (8-bit)",
+        };
+        wordSizeBtn.textContent = labels[state.wordSize] || `WORD (${state.wordSize}-bit)`;
+      }
+
+      // Keypad gating per active radix & mode (RULE-PROG-003)
+      const hexButtons = this.shadowRoot.querySelectorAll(".btn-hex");
+      hexButtons.forEach((btn) => {
+        (btn as HTMLButtonElement).disabled = !this.isProgrammerOpen || state.radix !== "HEX";
+      });
+
+      const keypad = this.shadowRoot.getElementById("keypad-grid");
+      if (keypad) {
+        const digitButtons = keypad.querySelectorAll('button[data-action="digit"]');
+        digitButtons.forEach((btn) => {
+          const val = btn.getAttribute("data-value");
+          let disabled = false;
+          if (this.isProgrammerOpen && val !== null) {
+            const d = parseInt(val, 10);
+            if (state.radix === "BIN" && d > 1) {
+              disabled = true;
+            } else if (state.radix === "OCT" && d > 7) {
+              disabled = true;
+            }
+          }
+          (btn as HTMLButtonElement).disabled = disabled;
+        });
+
+        const decimalBtn = keypad.querySelector('button[data-action="decimal"]');
+        if (decimalBtn) {
+          (decimalBtn as HTMLButtonElement).disabled = this.isProgrammerOpen;
         }
       }
     }
