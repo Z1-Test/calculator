@@ -1420,5 +1420,113 @@ describe("Autonomous Custom Element (<stay-calc>)", () => {
       assert.equal(calc.getProgrammerOpen(), false);
     });
   });
+
+  describe("13. Formula Expression Display & Parentheses Keys (CASE-EXPR-01, CASE-EXPR-05, CASE-EXPR-06, CASE-EXPR-11)", () => {
+    it("should initialize with #expression-display rendered in Shadow DOM with ARIA roles (CASE-EXPR-01)", () => {
+      const exprEl = calc.shadowRoot!.getElementById("expression-display");
+      assert.ok(exprEl, "#expression-display must exist in Shadow DOM");
+      assert.equal(exprEl.getAttribute("role"), "status");
+      assert.equal(exprEl.getAttribute("aria-label"), "Expression formula");
+      assert.equal(exprEl.getAttribute("aria-live"), "polite");
+      assert.equal(exprEl.textContent, "");
+    });
+
+    it("should update #expression-display in real time on button clicks (CASE-EXPR-01, CASE-EXPR-05)", () => {
+      const btn2 = calc.shadowRoot!.querySelector('button[data-value="2"]');
+      const btnMult = calc.shadowRoot!.querySelector('button[data-value="*"]');
+      const btnOpenParen = calc.shadowRoot!.querySelector('button[data-value="("]');
+      const btn3 = calc.shadowRoot!.querySelector('button[data-value="3"]');
+      const btnPlus = calc.shadowRoot!.querySelector('button[data-value="+"]');
+      const btn4 = calc.shadowRoot!.querySelector('button[data-value="4"]');
+      const btnCloseParen = calc.shadowRoot!.querySelector('button[data-value=")"]');
+      const btnEquals = calc.shadowRoot!.querySelector('button[data-action="calculate"]');
+
+      assert.ok(btnOpenParen, "Open parenthesis button must exist");
+      assert.ok(btnCloseParen, "Close parenthesis button must exist");
+
+      btn2?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnMult?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnOpenParen?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn3?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnPlus?.dispatchEvent(new Event("click", { bubbles: true }));
+      btn4?.dispatchEvent(new Event("click", { bubbles: true }));
+      btnCloseParen?.dispatchEvent(new Event("click", { bubbles: true }));
+
+      const exprEl = calc.shadowRoot!.getElementById("expression-display");
+      assert.equal(exprEl?.textContent, "2 * (3 + 4)");
+
+      btnEquals?.dispatchEvent(new Event("click", { bubbles: true }));
+      assert.equal(calc.getDisplayValue(), "14");
+    });
+
+    it("should evaluate parentheses via physical keyboard typing (CASE-EXPR-06)", () => {
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "(" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "7" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "+" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "8" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: ")" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+
+      assert.equal(calc.getDisplayValue(), "15");
+    });
+
+    it("should auto-balance unclosed parentheses on '=' keydown (CASE-EXPR-04)", () => {
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "(" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "5" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "*" }));
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "4" }));
+      // Leave paren unclosed and press Enter
+      mockWindow.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+
+      assert.equal(calc.getDisplayValue(), "20");
+    });
+
+    it("should provide accessible aria-labels and tactile pill styling on parentheses buttons (CASE-EXPR-05)", () => {
+      const openParen = calc.shadowRoot!.querySelector('button[data-value="("]');
+      const closeParen = calc.shadowRoot!.querySelector('button[data-value=")"]');
+
+      assert.ok(openParen);
+      assert.ok(closeParen);
+      assert.equal(openParen.getAttribute("data-action"), "paren");
+      assert.equal(closeParen.getAttribute("data-action"), "paren");
+      assert.equal(openParen.getAttribute("aria-label"), "Open parenthesis");
+      assert.equal(closeParen.getAttribute("aria-label"), "Close parenthesis");
+      assert.ok(openParen.classList.contains("span-two"));
+      assert.ok(closeParen.classList.contains("span-two"));
+    });
+
+    it("should synchronize expression display in slotted custom display", () => {
+      const slottedDiv = new MockElement("DIV");
+      slottedDiv.setAttribute("slot", "display");
+
+      const customExpr = new MockElement("DIV");
+      customExpr.setAttribute("data-expression-display", "true");
+      slottedDiv.appendChild(customExpr);
+
+      const customVal = new MockElement("DIV");
+      customVal.setAttribute("data-display-value", "true");
+      slottedDiv.appendChild(customVal);
+
+      calc.appendChild(slottedDiv);
+
+      calc.executeAction("digit", "9");
+      calc.executeAction("operator", "+");
+      calc.executeAction("digit", "6");
+
+      assert.equal(customExpr.textContent, "9 + 6");
+    });
+
+    it("should enforce mobile zero-overflow styling on expression display (CASE-EXPR-11)", () => {
+      const styleEl = calc.shadowRoot!.querySelector("style");
+      assert.ok(styleEl);
+      const css = styleEl.textContent;
+
+      assert.ok(css.includes(".expression-display"));
+      assert.ok(css.includes("overflow: hidden"));
+      assert.ok(css.includes("text-overflow: ellipsis"));
+      assert.ok(css.includes("white-space: nowrap"));
+      assert.ok(!css.includes("!important"), "CSS must strictly forbid !important");
+    });
+  });
 });
 
