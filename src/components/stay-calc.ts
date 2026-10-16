@@ -14,6 +14,7 @@ const STYLES = `
     box-sizing: inherit;
   }
   .calc-container {
+    position: relative;
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -452,6 +453,8 @@ const STYLES = `
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
     width: 100%;
     padding-bottom: 8px;
     margin-bottom: 8px;
@@ -465,6 +468,40 @@ const STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--calc-text-secondary, #71717a);
+  }
+  .history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .btn-history-action {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: var(--calc-container-low, #e4e4e7);
+    color: var(--calc-text-primary, #09090b);
+    border: 1px solid var(--calc-outline-low, #e4e4e7);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.1s ease, transform 0.08s ease;
+    box-sizing: border-box;
+  }
+  .btn-history-action:hover {
+    background-color: var(--calc-outline-low, #d4d4d8);
+  }
+  .btn-history-action:active {
+    transform: scale(0.96);
+  }
+  .btn-history-action:focus-visible {
+    outline: 2px solid var(--calc-primary, #2563eb);
+    outline-offset: 2px;
   }
   .btn-history-clear {
     height: 26px;
@@ -483,6 +520,35 @@ const STYLES = `
   .btn-history-clear:focus-visible {
     outline: 2px solid var(--calc-error, #ff453a);
     outline-offset: 2px;
+  }
+  .calc-toast {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background-color: var(--calc-text-primary, #18181b);
+    color: var(--calc-background, #ffffff);
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+    z-index: 50;
+    white-space: nowrap;
+    max-width: calc(100% - 32px);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .calc-toast.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
   }
   .history-empty {
     font-size: 13px;
@@ -540,7 +606,12 @@ const TEMPLATE_HTML = `
       <article class="history-panel" id="history-panel" part="history-panel">
         <header class="history-header">
           <span class="history-title">History</span>
-          <button type="button" class="btn-history-clear" id="history-clear" part="history-clear" data-action="clearHistory" aria-label="Clear calculation history">Clear History</button>
+          <div class="history-actions" part="history-actions">
+            <button type="button" class="btn-history-action" id="copy-result" part="copy-result" data-action="copyResult" aria-label="Copy active result to clipboard">Copy Result</button>
+            <button type="button" class="btn-history-action" id="export-csv" part="export-csv" data-action="exportCSV" aria-label="Export history tape to CSV">Export CSV</button>
+            <button type="button" class="btn-history-action" id="export-txt" part="export-txt" data-action="exportTXT" aria-label="Export history tape to plain text">Export TXT</button>
+            <button type="button" class="btn-history-clear" id="history-clear" part="history-clear" data-action="clearHistory" aria-label="Clear calculation history">Clear History</button>
+          </div>
         </header>
         <p class="history-empty" id="history-empty" part="history-empty">No calculations yet</p>
         <ul class="history-list" id="history-list" part="history-list" role="list"></ul>
@@ -646,6 +717,7 @@ const TEMPLATE_HTML = `
         <button type="button" class="btn-primary" data-action="calculate" aria-label="Equals">=</button>
       </div>
     </slot>
+    <div class="calc-toast" id="calc-toast" part="toast" role="status" aria-live="polite"></div>
   </div>
 `;
 
@@ -684,6 +756,7 @@ export class StayCalc extends HTMLElementBase {
   private scientificToggleListener: ((event: Event) => void) | null = null;
   private programmerClickListener: ((event: Event) => void) | null = null;
   private programmerToggleListener: ((event: Event) => void) | null = null;
+  private toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
@@ -875,6 +948,11 @@ export class StayCalc extends HTMLElementBase {
       window.removeEventListener("keydown", this.keydownListener);
       this.keydownListener = null;
     }
+
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+      this.toastTimeout = null;
+    }
   }
 
   /**
@@ -905,6 +983,116 @@ export class StayCalc extends HTMLElementBase {
    */
   public getHistoryOpen(): boolean {
     return this.isHistoryOpen;
+  }
+
+  /**
+   * Copies the active calculation result to the system clipboard via native Clipboard API,
+   * with graceful fallback to document.execCommand('copy') in restricted contexts.
+   * Displays non-intrusive status feedback via #calc-toast per RULE-CLIP-001.
+   */
+  public async copyResult(): Promise<void> {
+    const textToCopy = this.engine.getDisplay();
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
+        await navigator.clipboard.writeText(textToCopy);
+        this.showToast("Copied to clipboard");
+        return;
+      }
+      throw new Error("Clipboard API unavailable");
+    } catch {
+      // Fallback to offscreen textarea and document.execCommand('copy')
+      try {
+        if (typeof document !== "undefined") {
+          const textarea = document.createElement("textarea");
+          textarea.value = textToCopy;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const success = document.execCommand("copy");
+          document.body.removeChild(textarea);
+          if (success) {
+            this.showToast("Copied to clipboard");
+            return;
+          }
+        }
+      } catch {
+        // Fallback failed
+      }
+      this.showToast("Unable to copy to clipboard");
+    }
+  }
+
+  /**
+   * Exports the calculation history tape to a standard CSV file and triggers browser download.
+   */
+  public exportCSV(): void {
+    const csvContent = this.engine.exportHistoryToCSV();
+    this.triggerDownload(csvContent, "staycalc-history.csv", "text/csv;charset=utf-8;");
+    this.showToast("Exported CSV");
+  }
+
+  /**
+   * Exports the calculation history tape to a formatted plain text file and triggers browser download.
+   */
+  public exportTXT(): void {
+    const txtContent = this.engine.exportHistoryToText();
+    this.triggerDownload(txtContent, "staycalc-history.txt", "text/plain;charset=utf-8;");
+    this.showToast("Exported TXT");
+  }
+
+  /**
+   * Displays an accessible, non-intrusive live region toast notification (#calc-toast).
+   * Automatically dismisses after 2.5 seconds with debounced timer renewal per RULE-TOAST-001.
+   */
+  public showToast(message: string): void {
+    const toast = this.shadowRoot?.getElementById("calc-toast");
+    if (!toast) return;
+
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+      this.toastTimeout = null;
+    }
+
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    this.toastTimeout = setTimeout(() => {
+      toast.classList.remove("show");
+      this.toastTimeout = null;
+    }, 2500);
+  }
+
+  /**
+   * Triggers client-side file download via native Blob and temporary object URL.
+   */
+  public triggerDownload(content: string, filename: string, mimeType: string): void {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+    try {
+      const blob = new Blob([content], { type: mimeType });
+      if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 100);
+      }
+    } catch {
+      // Graceful fallback in non-browser environment
+    }
   }
 
   /**
@@ -1096,6 +1284,15 @@ export class StayCalc extends HTMLElementBase {
         break;
       case "clearHistory":
         this.engine.clearHistory();
+        break;
+      case "copyResult":
+        this.copyResult();
+        break;
+      case "exportCSV":
+        this.exportCSV();
+        break;
+      case "exportTXT":
+        this.exportTXT();
         break;
       case "toggleScientific":
         this.toggleScientific();
