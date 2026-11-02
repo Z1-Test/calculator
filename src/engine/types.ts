@@ -17,6 +17,7 @@ export interface EngineState {
   pendingOperator: StandardOperator | null;
   error: string | null;
   isNewInput: boolean;
+  waitingForOperand: boolean;
   memory: number;
 }
 

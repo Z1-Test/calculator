@@ -20,6 +20,7 @@ export class PrecisionArithmeticEngine {
   private pendingOperator: StandardOperator | null = null;
   private error: string | null = null;
   private isNewInput: boolean = true;
+  private waitingForOperand: boolean = false;
   private memoryRegister: number = 0;
 
   constructor() {
@@ -34,6 +35,7 @@ export class PrecisionArithmeticEngine {
     this.pendingOperator = null;
     this.error = null;
     this.isNewInput = true;
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 
@@ -42,6 +44,7 @@ export class PrecisionArithmeticEngine {
     this.currentBuffer = "0";
     this.error = null;
     this.isNewInput = true;
+    this.waitingForOperand = this.pendingOperator !== null;
     return this.getDisplay();
   }
 
@@ -58,6 +61,7 @@ export class PrecisionArithmeticEngine {
       pendingOperator: this.pendingOperator,
       error: this.error,
       isNewInput: this.isNewInput,
+      waitingForOperand: this.waitingForOperand,
       memory: this.memoryRegister,
     };
   }
@@ -97,6 +101,7 @@ export class PrecisionArithmeticEngine {
     if (this.error !== null) return this.getDisplay();
     this.currentBuffer = PrecisionArithmeticEngine.formatNumber(this.memoryRegister);
     this.isNewInput = true;
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 
@@ -133,6 +138,7 @@ export class PrecisionArithmeticEngine {
       if (numericDigits.length >= MAX_DISPLAY_DIGITS) return this.getDisplay();
       this.currentBuffer = this.currentBuffer === "0" ? digit : this.currentBuffer + digit;
     }
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 
@@ -147,6 +153,7 @@ export class PrecisionArithmeticEngine {
     if (!this.currentBuffer.includes(".")) {
       this.currentBuffer += ".";
     }
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 
@@ -159,7 +166,7 @@ export class PrecisionArithmeticEngine {
       return this.getDisplay();
     }
     // Consecutive operator replacement
-    if (this.pendingOperator !== null && this.isNewInput) {
+    if (this.pendingOperator !== null && this.waitingForOperand) {
       this.pendingOperator = normalizedOp;
       return this.getDisplay();
     }
@@ -179,6 +186,7 @@ export class PrecisionArithmeticEngine {
     }
     this.pendingOperator = normalizedOp;
     this.isNewInput = true;
+    this.waitingForOperand = true;
     return this.getDisplay();
   }
 
@@ -197,6 +205,7 @@ export class PrecisionArithmeticEngine {
     this.accumulator = null;
     this.pendingOperator = null;
     this.isNewInput = true;
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 
@@ -224,6 +233,7 @@ export class PrecisionArithmeticEngine {
     }
     this.currentBuffer = PrecisionArithmeticEngine.formatNumber(currentVal / 100);
     this.isNewInput = true;
+    this.waitingForOperand = false;
     return this.getDisplay();
   }
 

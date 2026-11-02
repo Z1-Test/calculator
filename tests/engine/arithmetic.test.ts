@@ -372,5 +372,26 @@ describe("PrecisionArithmeticEngine", () => {
     calc.memoryRecall();
     assert.equal(calc.getDisplay(), "100");
   });
+
+  it("verifies chained sequence execution following memory recall (5 + [MR] 4 = and 5 * [MR] =)", () => {
+    const calc = new PrecisionArithmeticEngine();
+
+    // Store 10 into memory
+    calc.inputSequence(["10", "M+"]);
+    assert.equal(calc.getMemory(), 10);
+
+    // 5 * [MR] = -> evaluates to 5 * 10 = 50
+    calc.inputSequence(["5", "*", "MR", "="]);
+    assert.equal(calc.getDisplay(), "50");
+
+    // 5 + [MR] 4 = -> operand replacement on digit entry following MR yields 5 + 4 = 9
+    calc.inputSequence(["5", "+", "MR", "4", "="]);
+    assert.equal(calc.getDisplay(), "9");
+
+    // 5 + [MR] + 2 = -> chained operator following MR evaluates intermediate 5 + 10 = 15, then + 2 = 17
+    calc.inputSequence(["5", "+", "MR", "+", "2", "="]);
+    assert.equal(calc.getDisplay(), "17");
+  });
 });
+
 
