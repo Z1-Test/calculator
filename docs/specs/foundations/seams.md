@@ -13,4 +13,4 @@ tags: [seams, foundations]
 
 | ID | From | To | Contract |
 | :--- | :--- | :--- | :--- |
-| SEAM-CALC-01 | UI Keypad | Arithmetic Engine | Keypad presses feed numeric tokens and operators into the engine |
+| SEAM-CALC-01 | UI Keypad | Arithmetic Engine | Keypad presses feed numeric tokens, operators, and memory register actions into the engine |

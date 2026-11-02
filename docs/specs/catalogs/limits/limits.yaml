@@ -10,3 +10,9 @@ entries:
     limit: 320
     code: LIM-CALC-MIN-VIEWPORT
     description: Minimum mobile viewport width in pixels guaranteed without horizontal scroll overflow
+  - id: LIM-CALC-MEMORY-DEFAULT
+    name: DefaultMemoryValue
+    limit: 0
+    code: LIM-CALC-MEMORY-DEFAULT
+    description: Initial default value of calculator memory register
+

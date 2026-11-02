@@ -14,3 +14,11 @@ entries:
     decided_date: "2026-11-02"
     slices: [component]
     summary: Autonomous custom element <stay-calc> encapsulates interactive keypad and display in Declarative Shadow DOM with host/document keyboard listeners.
+  - id: DEC-CALC-03
+    title: High-precision memory registers and visual indicator
+    status: decided
+    decided_by: "human:maintainer"
+    decided_date: "2026-11-02"
+    slices: [engine, component]
+    summary: Dedicated memory registers (M+, M-, MR, MC) store intermediate accumulative results, persisting across standard calculations with active visual M badge indicator when non-zero.
+

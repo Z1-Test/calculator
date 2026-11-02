@@ -43,3 +43,17 @@ flowchart TD
   R --> S["Dispatch matching operation to engine"]
   S --> T["Update shadow DOM display and ARIA live status"]
 ```
+
+## FLW-UI-03 Memory keypad delegation and visual badge flow
+
+```mermaid
+flowchart TD
+  A["User clicks memory button (MC, MR, M-, M+)"] --> B["Delegate to engine memory method"]
+  B --> C["Update display buffer"]
+  C --> D{"Does engine have memory (hasMemory)?"}
+  D -- yes --> E["Display active visual M badge"]
+  D -- no --> F["Hide visual M badge"]
+  E --> G["Announce display change via polite live region"]
+  F --> G
+```
+

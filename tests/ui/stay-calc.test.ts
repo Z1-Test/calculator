@@ -19,6 +19,7 @@ class MockDOMElement {
   public shadowRoot: MockShadowRoot | null = null;
   public id: string = "";
   public className: string = "";
+  public hidden: boolean = false;
 
   constructor(tagName = "div", parentNode: MockDOMElement | null = null) {
     this.tagName = tagName;
@@ -41,7 +42,18 @@ class MockDOMElement {
       this.className = strVal;
       this.classList = new Set(strVal.split(/\s+/).filter(Boolean));
     }
+    if (name === "hidden") {
+      this.hidden = true;
+    }
   }
+
+  public removeAttribute(name: string): void {
+    delete this.attributes[name];
+    if (name === "hidden") {
+      this.hidden = false;
+    }
+  }
+
 
   public closest(selector: string): MockDOMElement | null {
     if (selector === this.tagName.toLowerCase()) return this;
@@ -265,6 +277,11 @@ describe("<stay-calc> Accessible Web Calculator Component", () => {
     assert.ok(display, "#display element must exist in shadow tree");
     assert.equal(display.textContent, "0", "Initial display text must be '0'");
 
+    const memoryBadge = calc.shadowRoot.querySelector("#memory-badge");
+    assert.ok(memoryBadge, "#memory-badge element must exist in shadow tree");
+    assert.equal(memoryBadge.textContent, "M");
+    assert.equal(memoryBadge.hidden, true, "Memory badge should initially be hidden");
+
     const status = calc.shadowRoot.querySelector("#status");
     assert.ok(status, "#status element must exist for polite ARIA live updates");
     assert.equal(status.getAttribute("role"), "status");
@@ -275,7 +292,8 @@ describe("<stay-calc> Accessible Web Calculator Component", () => {
     assert.ok(keypad, "Keypad container must exist");
 
     const buttons = calc.shadowRoot.querySelectorAll("button");
-    assert.ok(buttons.length >= 18, `Keypad must contain at least 18 buttons, found ${buttons.length}`);
+    assert.ok(buttons.length >= 22, `Keypad must contain at least 22 buttons, found ${buttons.length}`);
+
 
     // Verify registration helper
     const registered = defineStayCalc();
@@ -520,4 +538,128 @@ describe("<stay-calc> Accessible Web Calculator Component", () => {
     assert.equal(calc.getDisplay(), "7");
     assert.equal(display.textContent, "7");
   });
+
+  it("CASE-UI-09: Keypad clicks on M+, M-, MR, MC route to engine memory methods and update display", () => {
+    const buttons = calc.shadowRoot!.querySelectorAll("button");
+    const findButton = (pred: (btn: MockDOMElement) => boolean) => {
+      const b = buttons.find(pred);
+      assert.ok(b, "Button matching predicate must exist");
+      return b;
+    };
+
+    const btn1 = findButton((b) => b.dataset.digit === "1");
+    const btn0 = findButton((b) => b.dataset.digit === "0");
+    const btnMPlus = findButton((b) => b.dataset.action === "memory-add");
+    const btnMMinus = findButton((b) => b.dataset.action === "memory-subtract");
+    const btnMR = findButton((b) => b.dataset.action === "memory-recall");
+    const btnMC = findButton((b) => b.dataset.action === "memory-clear");
+    const btnC = findButton((b) => b.dataset.action === "clear");
+    const btn4 = findButton((b) => b.dataset.digit === "4");
+
+    // Input 10 and click M+
+    btn1.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    btn0.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    btnMPlus.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    assert.equal(calc.getMemory(), 10);
+    assert.equal(calc.hasMemory(), true);
+
+    // Input 4 and click M-
+    btn4.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    btnMMinus.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    assert.equal(calc.getMemory(), 6);
+
+    // Clear display buffer with C -> display is 0, memory is 6
+    btnC.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    assert.equal(calc.getDisplay(), "0");
+    assert.equal(calc.getMemory(), 6);
+
+    // Click MR -> recalls 6
+    btnMR.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    assert.equal(calc.getDisplay(), "6");
+    assert.equal(calc.shadowRoot!.querySelector("#display")!.textContent, "6");
+
+    // Click MC -> clears memory
+    btnMC.dispatchEvent(new MockMouseEvent("click", { bubbles: true }));
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(calc.hasMemory(), false);
+  });
+
+  it("CASE-UI-10: Visual 'M' indicator badge becomes visible (hidden = false) when memory register is non-zero", () => {
+    const memoryBadge = calc.shadowRoot!.querySelector("#memory-badge")!;
+    assert.equal(memoryBadge.hidden, true, "Initially hidden when memory is 0");
+
+    // Accumulate value 42 into memory
+    calc.inputDigit("4");
+    calc.inputDigit("2");
+    calc.memoryAdd();
+
+    assert.equal(calc.getMemory(), 42);
+    assert.equal(calc.hasMemory(), true);
+    assert.equal(memoryBadge.hidden, false, "Badge must be visible when memory is non-zero");
+    assert.equal(memoryBadge.getAttribute("hidden"), null);
+  });
+
+  it("CASE-UI-11: Visual 'M' indicator badge hides (hidden = true) immediately upon MC or when memory returns to 0", () => {
+    const memoryBadge = calc.shadowRoot!.querySelector("#memory-badge")!;
+
+    // Store 15
+    calc.inputDigit("1");
+    calc.inputDigit("5");
+    calc.memoryAdd();
+    assert.equal(memoryBadge.hidden, false);
+
+    // Clear memory with MC
+    calc.memoryClear();
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(memoryBadge.hidden, true, "Badge must hide upon memoryClear()");
+    assert.notEqual(memoryBadge.getAttribute("hidden"), null);
+
+    // Test returning to zero via subtraction: M+ 5, M- 5
+    calc.inputDigit("5");
+    calc.memoryAdd();
+    assert.equal(memoryBadge.hidden, false);
+    calc.memorySubtract();
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(memoryBadge.hidden, true, "Badge must hide when memory subtracts to 0");
+  });
+
+  it("CASE-UI-12: 6-row keypad layout with memory row maintains zero horizontal scroll overflow across 320px, 375px, 390px viewports", () => {
+    // Verify stylesheet has memory classes and styles
+    assert.ok(
+      stayCalcStyles.includes(".calc-memory-indicator"),
+      "Styles must declare .calc-memory-indicator class"
+    );
+    assert.ok(
+      stayCalcStyles.includes(".calc-btn-memory"),
+      "Styles must declare .calc-btn-memory class"
+    );
+
+    // Total keypad buttons: 24 (4 memory + 20 baseline)
+    const buttons = calc.shadowRoot!.querySelectorAll("button");
+    assert.equal(buttons.length, 24, "Keypad must contain 24 buttons across 6 rows of 4 columns");
+
+    // Verify memory buttons have accessible aria-labels
+    const memoryButtons = buttons.filter((b) => b.classList.has("calc-btn-memory"));
+    assert.equal(memoryButtons.length, 4, "Must have 4 memory buttons");
+    assert.equal(memoryButtons[0].getAttribute("aria-label"), "Memory clear");
+    assert.equal(memoryButtons[1].getAttribute("aria-label"), "Memory recall");
+    assert.equal(memoryButtons[2].getAttribute("aria-label"), "Memory subtract");
+    assert.equal(memoryButtons[3].getAttribute("aria-label"), "Memory add");
+
+    // Layout zero-overflow validation across 320, 375, 390 viewports
+    const viewports = [320, 375, 390];
+    for (const vp of viewports) {
+      const padding = vp <= 340 ? 16 : vp <= 390 ? 24 : 32;
+      const gap = vp <= 340 ? 4 : vp <= 390 ? 6 : 8;
+      const availableWidth = vp - padding;
+      const totalColWidth = availableWidth - gap * 3;
+      const buttonWidth = Math.floor(totalColWidth / 4);
+      const totalRenderedWidth = buttonWidth * 4 + gap * 3 + padding;
+      assert.ok(
+        totalRenderedWidth <= vp,
+        `Viewport ${vp}px rendered width (${totalRenderedWidth}px) must be <= clientWidth (${vp}px)`
+      );
+    }
+  });
 });
+

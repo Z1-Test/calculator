@@ -13,6 +13,7 @@ export function renderStayCalcTemplate(): string {
     <slot name="header"></slot>
   </div>
   <div class="calc-display-wrapper" part="display-wrapper">
+    <span id="memory-badge" class="calc-memory-indicator" part="memory-badge" aria-hidden="true" hidden>M</span>
     <slot name="display">
       <div
         id="display"
@@ -34,31 +35,37 @@ export function renderStayCalcTemplate(): string {
   >0</div>
   <div class="calc-keypad" part="keypad" role="group" aria-label="Calculator keypad">
     <slot name="keypad">
-      <!-- Row 1 -->
+      <!-- Row 1: Memory Registers -->
+      <button type="button" class="calc-btn calc-btn-secondary calc-btn-memory" data-action="memory-clear" aria-label="Memory clear">MC</button>
+      <button type="button" class="calc-btn calc-btn-secondary calc-btn-memory" data-action="memory-recall" aria-label="Memory recall">MR</button>
+      <button type="button" class="calc-btn calc-btn-secondary calc-btn-memory" data-action="memory-subtract" aria-label="Memory subtract">M-</button>
+      <button type="button" class="calc-btn calc-btn-secondary calc-btn-memory" data-action="memory-add" aria-label="Memory add">M+</button>
+
+      <!-- Row 2 -->
       <button type="button" class="calc-btn calc-btn-secondary" data-action="all-clear" aria-label="All clear">AC</button>
       <button type="button" class="calc-btn calc-btn-secondary" data-action="clear" aria-label="Clear entry">C</button>
       <button type="button" class="calc-btn calc-btn-secondary" data-action="toggle-sign" aria-label="Toggle sign">+/-</button>
       <button type="button" class="calc-btn calc-btn-operator" data-operator="/" aria-label="Divide">÷</button>
 
-      <!-- Row 2 -->
+      <!-- Row 3 -->
       <button type="button" class="calc-btn calc-btn-digit" data-digit="7" aria-label="Digit 7">7</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="8" aria-label="Digit 8">8</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="9" aria-label="Digit 9">9</button>
       <button type="button" class="calc-btn calc-btn-operator" data-operator="*" aria-label="Multiply">×</button>
 
-      <!-- Row 3 -->
+      <!-- Row 4 -->
       <button type="button" class="calc-btn calc-btn-digit" data-digit="4" aria-label="Digit 4">4</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="5" aria-label="Digit 5">5</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="6" aria-label="Digit 6">6</button>
       <button type="button" class="calc-btn calc-btn-operator" data-operator="-" aria-label="Subtract">-</button>
 
-      <!-- Row 4 -->
+      <!-- Row 5 -->
       <button type="button" class="calc-btn calc-btn-digit" data-digit="1" aria-label="Digit 1">1</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="2" aria-label="Digit 2">2</button>
       <button type="button" class="calc-btn calc-btn-digit" data-digit="3" aria-label="Digit 3">3</button>
       <button type="button" class="calc-btn calc-btn-operator" data-operator="+" aria-label="Add">+</button>
 
-      <!-- Row 5 -->
+      <!-- Row 6 -->
       <button type="button" class="calc-btn calc-btn-digit calc-btn-zero" data-digit="0" aria-label="Digit 0">0</button>
       <button type="button" class="calc-btn calc-btn-digit" data-action="decimal" aria-label="Decimal point">.</button>
       <button type="button" class="calc-btn calc-btn-action" data-action="percent" aria-label="Percent">%</button>

@@ -24,6 +24,11 @@ Up: [flow](./flow.md). One row per case.
 | CASE-UI-06 | Narrow viewport simulated | Resized to 320px, 375px, 390px | Layout fits container without horizontal overflow per `RULE-UI-005` and `LIM-CALC-MIN-VIEWPORT` |
 | CASE-UI-07 | Display updates | Calculation completes or resets | Polite ARIA live status region announces updated text per `RULE-UI-006` |
 | CASE-UI-08 | Division by zero triggered | Key sequence 8 / 0 = executed | Display shows `ERR-CALC-0001` and unlocks on C or AC per `RULE-UI-002` |
+| CASE-UI-09 | Keypad rendered | User clicks M+, M-, MR, MC buttons | Memory actions delegate to engine and update display per `RULE-UI-007` and `DEC-CALC-03` |
+| CASE-UI-10 | Memory register non-zero | User performs M+ with value | Visual M indicator badge unhides and becomes visible per `RULE-UI-008` and `DEC-CALC-03` |
+| CASE-UI-11 | Visual M indicator visible | User clicks MC or reduces memory to zero | Visual M indicator badge hides immediately per `RULE-UI-008` and `DEC-CALC-03` |
+| CASE-UI-12 | Responsive keypad rendered | Viewport resized to 320px, 375px, 390px | 6-row keypad layout maintains zero horizontal scroll overflow per `RULE-UI-005` and `LIM-CALC-MIN-VIEWPORT` |
+
 
 ## Not applicable
 

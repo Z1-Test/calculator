@@ -35,8 +35,28 @@ export const stayCalcStyles = `
 }
 
 .calc-display-wrapper {
+  position: relative;
   inline-size: 100%;
 }
+
+.calc-memory-indicator {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-start: 14px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sl-primary, #2563eb);
+  background: transparent;
+  user-select: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.calc-memory-indicator[hidden] {
+  display: none;
+}
+
 
 .calc-display {
   display: flex;
@@ -109,7 +129,13 @@ export const stayCalcStyles = `
   background-color: var(--sl-outline, #cbd5e1);
 }
 
+.calc-btn-memory {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 .calc-btn-operator {
+
   background-color: var(--sl-primary, #2563eb);
   color: var(--sl-on-primary, #ffffff);
   border-color: var(--sl-primary, #2563eb);
@@ -176,6 +202,11 @@ export const stayCalcStyles = `
     min-block-size: 56px;
     padding-inline: 12px;
   }
+  .calc-memory-indicator {
+    inset-block-start: 10px;
+    inset-inline-start: 12px;
+    font-size: 0.8125rem;
+  }
 }
 
 @container (max-width: 340px) {
@@ -197,5 +228,14 @@ export const stayCalcStyles = `
     padding-inline: 8px;
     font-size: 1.25rem;
   }
+  .calc-memory-indicator {
+    inset-block-start: 8px;
+    inset-inline-start: 10px;
+    font-size: 0.75rem;
+  }
+  .calc-btn-memory {
+    font-size: 0.875rem;
+  }
 }
+
 `.trim();
