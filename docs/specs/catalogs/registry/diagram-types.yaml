@@ -1,0 +1,26 @@
+# Mermaid types allowed in the specs. portable: true renders on Mermaid 11 and 12 viewers.
+# Types with portable: true are accepted by specs-check and stayspec-diagram.
+types:
+  - { keyword: flowchart,          portable: true,  use: "scope, mechanisms, decisions, DFD in dataflow.md, recovery" }
+  - { keyword: sequenceDiagram,    portable: true,  use: "interaction order and error flows in sequence.md" }
+  - { keyword: stateDiagram-v2,    portable: true,  use: "lifecycle states in state.md" }
+  - { keyword: erDiagram,          portable: true,  use: "stored data and keys in data.md" }
+  - { keyword: classDiagram,       portable: true,  use: "payload and contract shapes in api.md" }
+  - { keyword: requirementDiagram, portable: true,  use: "requirements and control-to-test traceability in compliance.md" }
+  - { keyword: journey,            portable: true,  use: "macro user journeys and flows" }
+  - { keyword: eventmodeling,      portable: true,  use: "commands, events and read models over time in events.md" }
+  - { keyword: C4Context,          portable: true,  use: "system context and external boundaries in L0 context.md" }
+  - { keyword: C4Container,        portable: true,  use: "container and service deployment topology in deployment.md" }
+  - { keyword: mindmap,            portable: true,  use: "scope exploration and context clustering in L0 context.md" }
+  - { keyword: timeline,           portable: true,  use: "milestones, releases and temporal roadmap" }
+  - { keyword: gantt,              portable: true,  use: "phased schedules and execution dependencies" }
+  - { keyword: pie,                portable: true,  use: "cost distribution and budget allocation in cost-and-capacity.md" }
+  - { keyword: quadrantChart,      portable: true,  use: "2x2 decision matrices and Pareto analysis" }
+  - { keyword: xychart-beta,       portable: true,  use: "SLO metrics, latency budgets and analytics" }
+  - { keyword: kanban,             portable: true,  use: "workflow stages and task status boards" }
+  - { keyword: packet-beta,        portable: true,  use: "byte and bit-aligned network packet headers" }
+  - { keyword: architecture-beta,  portable: true,  use: "cloud infrastructure and service topology in deployment.md" }
+  - { keyword: swimlane-beta,      portable: true,  use: "cross-team and cross-system hand-offs in process.md" }
+  - { keyword: gitGraph,           portable: true,  use: "branching, releases and merge protocols" }
+  - { keyword: block-beta,         portable: true,  use: "architectural blocks and hardware topology" }
+  - { keyword: usecase-beta,       portable: false, use: "not native in mermaid; use flowchart twin" }

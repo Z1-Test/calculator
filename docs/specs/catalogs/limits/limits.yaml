@@ -1,0 +1,7 @@
+---
+entries:
+  - id: LIM-CALC-DIGITS
+    name: MaxDisplayDigits
+    limit: 10
+    code: LIM-CALC-DIGITS
+    description: Maximum significant digits displayed in calculator buffer

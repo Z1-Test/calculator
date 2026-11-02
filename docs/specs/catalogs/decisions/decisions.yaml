@@ -1,0 +1,9 @@
+---
+entries:
+  - id: DEC-CALC-01
+    title: Pocket calculator immediate execution sequential arithmetic model
+    status: decided
+    decided_by: "human:maintainer"
+    decided_date: "2026-11-02"
+    slices: [engine]
+    summary: Operations evaluate sequentially left-to-right on operator input without algebraic operator precedence.

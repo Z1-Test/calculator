@@ -1,0 +1,6 @@
+---
+entries:
+  - id: FF-CALC-IMMEDIATE
+    name: ImmediateExecution
+    status: active
+    description: Pocket calculator sequential evaluation mode

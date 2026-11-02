@@ -1,0 +1,41 @@
+# Rigor tiers. Proposed from the risk card in feature.md, confirmed by the owner.
+# `required` lists the module files a slice of that tier must have next to feature.md.
+tiers:
+  - id: T0
+    name: Critical
+    review_days: 90
+    required:
+      - feature
+      - flow
+      - cases
+      - state
+      - sequence
+      - data
+      - api
+      - dataflow
+      - failure-modes
+      - compliance
+      - ops
+  - id: T1
+    name: Core
+    review_days: 180
+    required:
+      - feature
+      - flow
+      - cases
+      - state
+      - sequence
+      - data
+      - api
+  - id: T2
+    name: Standard
+    review_days: 365
+    required:
+      - feature
+      - flow
+      - cases
+  - id: T3
+    name: Light
+    review_days: 365
+    required:
+      - feature
