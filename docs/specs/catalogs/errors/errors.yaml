@@ -1,0 +1,12 @@
+---
+entries:
+  - id: ERR-CALC-0001
+    name: DivisionByZero
+    summary: Attempted division by zero
+    ui: none
+    remedy: Press C or AC to clear error state
+  - id: ERR-CALC-0002
+    name: InvalidInput
+    summary: Malformed or unparseable arithmetic input
+    ui: none
+    remedy: Press C or AC to reset buffer
