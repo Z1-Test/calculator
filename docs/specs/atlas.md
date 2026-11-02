@@ -15,11 +15,15 @@ tags: [atlas, architecture]
 flowchart TD
   subgraph Capabilities
     Arithmetic["Arithmetic Capability"]
+    Presentation["Presentation Capability"]
   end
 
   subgraph Slices
     Engine["Precision Arithmetic Engine (T2)"]
+    Component["Accessible Web Calculator Component (T2)"]
   end
 
   Arithmetic --> Engine
+  Presentation --> Component
+  Component --> Engine
 ```

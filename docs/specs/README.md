@@ -18,3 +18,4 @@ Canonical specification tree for StayCalc.
 | Slice | Capability | Tier |
 | :--- | :--- | :--- |
 | [Precision arithmetic engine](./features/arithmetic/engine/feature.md) | [Arithmetic](./capabilities/arithmetic.md) | T2 |
+| [Accessible web calculator component](./features/ui/component/feature.md) | [Presentation](./capabilities/presentation.md) | T2 |
