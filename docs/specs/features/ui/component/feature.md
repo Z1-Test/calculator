@@ -21,6 +21,7 @@ Up: [Presentation capability](../../../capabilities/presentation.md). Modules: [
 - An autonomous custom element `<stay-calc>` encapsulates the keypad and display in an open Shadow DOM root.
 - Physical keyboard keys (0-9, operators, Enter, Escape, Backspace) trigger immediate calculation updates.
 - Visible focus rings, WCAG 2.2 AA contrast, and ARIA live announcements ensure accessibility across viewports down to 320px.
+- An active visual M badge indicates when memory registers contain stored values.
 
 ## How it works
 
@@ -54,6 +55,8 @@ Proposed T2, confirmed by the owner: yes.
 - `RULE-UI-004`: Interactive elements maintain visible `:focus-visible` focus rings and WCAG 2.2 AA contrast ratios.
 - `RULE-UI-005`: Layout utilizes CSS logical properties and container queries ensuring zero horizontal scroll overflow across viewports down to `LIM-CALC-MIN-VIEWPORT`.
 - `RULE-UI-006`: Status container with `aria-live="polite"` broadcasts calculation results and error notifications.
+- `RULE-UI-007`: Keypad memory buttons (MC, MR, M-, M+) delegate to engine memory methods across `SEAM-CALC-01` per `DEC-CALC-03`.
+- `RULE-UI-008`: Active visual M indicator badge displays if and only if memory register is non-zero per `DEC-CALC-03`.
 - `NEVER-UI-001`: Never introduce external runtime packages or styling dependencies.
 
 ## Examples
@@ -61,14 +64,16 @@ Proposed T2, confirmed by the owner: yes.
 - **Keypad button calculation.** Alice clicks button 7, then plus, then button 8, then equals. The component calls the arithmetic engine and updates the display buffer to 15. Rules: `RULE-UI-002`.
 - **Physical keyboard entry.** Bob presses key 4 followed by asterisk, 5, and Enter on his physical keyboard. The component delegates key events to the arithmetic engine and updates the display to 20. Rules: `RULE-UI-003`.
 - **Accessible screen reader announcement.** Carol types 9 divided by 0 equals on a screen reader. The ARIA live region politely announces the error string `Cannot divide by zero`. Rules: `RULE-UI-006`.
+- **Visual memory indicator.** Dave presses ten then memory add. The visual M indicator appears on the display. Dave presses memory clear and the indicator disappears. Rules: `RULE-UI-007`, `RULE-UI-008`.
 
 ## Code anchors
 
 - `src/ui/stay-calc.ts` `StayCalc.connectedCallback`: Custom element lifecycle registration and shadow root initialization (`RULE-UI-001`).
-- `src/ui/stay-calc.ts` `StayCalc.handleKeypadClick`: Keypad click delegation to engine (`RULE-UI-002`).
+- `src/ui/stay-calc.ts` `StayCalc.handleKeypadClick`: Keypad click delegation to engine (`RULE-UI-002`, `RULE-UI-007`).
 - `src/ui/stay-calc.ts` `StayCalc.handleKeyDown`: Physical keyboard listener and normalizer (`RULE-UI-003`).
 - `src/ui/stay-calc.styles.ts` `stayCalcStyles`: CSS logical properties, focus rings, and container queries (`RULE-UI-004`, `RULE-UI-005`).
-- `src/ui/stay-calc.template.ts` `renderStayCalcTemplate`: DSD shadow root template and ARIA live status node (`RULE-UI-001`, `RULE-UI-006`).
+- `src/ui/stay-calc.template.ts` `renderStayCalcTemplate`: DSD shadow root template and ARIA live status node (`RULE-UI-001`, `RULE-UI-006`, `RULE-UI-008`).
+- `src/ui/stay-calc.ts` `StayCalc.updateDisplay`: Toggles visual memory badge (`RULE-UI-008`).
 
 ## Seams
 

@@ -20,12 +20,14 @@ export class PrecisionArithmeticEngine {
   private pendingOperator: StandardOperator | null = null;
   private error: string | null = null;
   private isNewInput: boolean = true;
+  private memoryRegister: number = 0;
 
   constructor() {
     this.allClear();
+    this.memoryRegister = 0;
   }
 
-  /** Resets all registers, pending operations, and errors to initial state (AC). */
+  /** Resets all registers, pending operations, and errors to initial state (AC). Memory is preserved. */
   public allClear(): string {
     this.accumulator = null;
     this.currentBuffer = "0";
@@ -35,7 +37,7 @@ export class PrecisionArithmeticEngine {
     return this.getDisplay();
   }
 
-  /** Resets active buffer to "0" preserving accumulator and pending operator (C). */
+  /** Resets active buffer to "0" preserving accumulator, pending operator, and memory (C). */
   public clear(): string {
     this.currentBuffer = "0";
     this.error = null;
@@ -56,8 +58,64 @@ export class PrecisionArithmeticEngine {
       pendingOperator: this.pendingOperator,
       error: this.error,
       isNewInput: this.isNewInput,
+      memory: this.memoryRegister,
     };
   }
+
+  /** Adds current display value to memory register with high-precision normalization (M+). */
+  public memoryAdd(): string {
+    if (this.error !== null) return this.getDisplay();
+    const currentVal = Number(this.currentBuffer);
+    if (!Number.isFinite(currentVal)) {
+      this.error = ERR_INVALID_INPUT;
+      return this.getDisplay();
+    }
+    const sum = this.memoryRegister + currentVal;
+    const rounded = Math.round((sum + Number.EPSILON) * 1e12) / 1e12;
+    this.memoryRegister = Object.is(rounded, -0) || rounded === 0 ? 0 : rounded;
+    this.isNewInput = true;
+    return this.getDisplay();
+  }
+
+  /** Subtracts current display value from memory register with high-precision normalization (M-). */
+  public memorySubtract(): string {
+    if (this.error !== null) return this.getDisplay();
+    const currentVal = Number(this.currentBuffer);
+    if (!Number.isFinite(currentVal)) {
+      this.error = ERR_INVALID_INPUT;
+      return this.getDisplay();
+    }
+    const diff = this.memoryRegister - currentVal;
+    const rounded = Math.round((diff + Number.EPSILON) * 1e12) / 1e12;
+    this.memoryRegister = Object.is(rounded, -0) || rounded === 0 ? 0 : rounded;
+    this.isNewInput = true;
+    return this.getDisplay();
+  }
+
+  /** Recalls memory register value into active input buffer without modifying memory (MR). */
+  public memoryRecall(): string {
+    if (this.error !== null) return this.getDisplay();
+    this.currentBuffer = PrecisionArithmeticEngine.formatNumber(this.memoryRegister);
+    this.isNewInput = true;
+    return this.getDisplay();
+  }
+
+  /** Resets memory register to zero (MC). */
+  public memoryClear(): string {
+    this.memoryRegister = 0;
+    return this.getDisplay();
+  }
+
+  /** Returns current numerical value of the memory register. */
+  public getMemory(): number {
+    return this.memoryRegister;
+  }
+
+  /** Checks if memory register contains a non-zero value. */
+  public hasMemory(): boolean {
+    return this.memoryRegister !== 0;
+  }
+
 
   /** Inputs a single numeric digit ('0'-'9') or decimal point ('.'). */
   public inputDigit(digit: string): string {
@@ -175,6 +233,10 @@ export class PrecisionArithmeticEngine {
       if (token === "C" || token === "c") this.clear();
       else if (token === "AC" || token === "ac") this.allClear();
       else if (token === "=" || token === "Enter") this.calculate();
+      else if (token === "M+" || token === "m+") this.memoryAdd();
+      else if (token === "M-" || token === "m-") this.memorySubtract();
+      else if (token === "MR" || token === "mr") this.memoryRecall();
+      else if (token === "MC" || token === "mc") this.memoryClear();
       else if (["+", "-", "*", "/", "×", "÷"].includes(token)) this.inputOperator(token as Operator);
       else if (token === ".") this.inputDecimal();
       else if (token === "+/-") this.toggleSign();

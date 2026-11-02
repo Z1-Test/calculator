@@ -21,6 +21,7 @@ export class StayCalc extends BaseElement {
   private displayElement: HTMLElement | null = null;
   private statusElement: HTMLElement | null = null;
   private keypadElement: HTMLElement | null = null;
+  private memoryBadgeElement: HTMLElement | null = null;
 
   private boundHandleKeypadClick = this.handleKeypadClick.bind(this);
   private boundHandleKeyDown = this.handleKeyDown.bind(this);
@@ -43,6 +44,7 @@ export class StayCalc extends BaseElement {
       this.displayElement = this.shadowRoot.querySelector("#display");
       this.statusElement = this.shadowRoot.querySelector("#status");
       this.keypadElement = this.shadowRoot.querySelector(".calc-keypad");
+      this.memoryBadgeElement = this.shadowRoot.querySelector("#memory-badge");
     }
 
     if (this.keypadElement) {
@@ -57,6 +59,7 @@ export class StayCalc extends BaseElement {
   }
 
   public disconnectedCallback(): void {
+
     if (this.keypadElement) {
       this.keypadElement.removeEventListener("click", this.boundHandleKeypadClick);
     }
@@ -159,6 +162,56 @@ export class StayCalc extends BaseElement {
   }
 
   /**
+   * Adds current display value to memory register (M+).
+   */
+  public memoryAdd(): string {
+    const val = this.engine.memoryAdd();
+    this.updateDisplay();
+    return val;
+  }
+
+  /**
+   * Subtracts current display value from memory register (M-).
+   */
+  public memorySubtract(): string {
+    const val = this.engine.memorySubtract();
+    this.updateDisplay();
+    return val;
+  }
+
+  /**
+   * Recalls memory register value into active input buffer (MR).
+   */
+  public memoryRecall(): string {
+    const val = this.engine.memoryRecall();
+    this.updateDisplay();
+    return val;
+  }
+
+  /**
+   * Resets memory register to zero (MC).
+   */
+  public memoryClear(): string {
+    const val = this.engine.memoryClear();
+    this.updateDisplay();
+    return val;
+  }
+
+  /**
+   * Returns current numerical value of the memory register.
+   */
+  public getMemory(): number {
+    return this.engine.getMemory();
+  }
+
+  /**
+   * Checks if memory register contains a non-zero value.
+   */
+  public hasMemory(): boolean {
+    return this.engine.hasMemory();
+  }
+
+  /**
    * Delegates button clicks on keypad.
    */
   public handleKeypadClick(event: MouseEvent | Event): void {
@@ -195,6 +248,18 @@ export class StayCalc extends BaseElement {
         break;
       case "percent":
         this.inputPercent();
+        break;
+      case "memory-clear":
+        this.memoryClear();
+        break;
+      case "memory-recall":
+        this.memoryRecall();
+        break;
+      case "memory-subtract":
+        this.memorySubtract();
+        break;
+      case "memory-add":
+        this.memoryAdd();
         break;
     }
   }
@@ -296,6 +361,20 @@ export class StayCalc extends BaseElement {
     }
     if (this.statusElement) {
       this.statusElement.textContent = text;
+    }
+    if (this.memoryBadgeElement) {
+      const hasMem = this.engine.hasMemory();
+      if (hasMem) {
+        if (typeof this.memoryBadgeElement.removeAttribute === "function") {
+          this.memoryBadgeElement.removeAttribute("hidden");
+        }
+        (this.memoryBadgeElement as any).hidden = false;
+      } else {
+        if (typeof this.memoryBadgeElement.setAttribute === "function") {
+          this.memoryBadgeElement.setAttribute("hidden", "");
+        }
+        (this.memoryBadgeElement as any).hidden = true;
+      }
     }
   }
 }

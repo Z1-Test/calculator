@@ -257,4 +257,120 @@ describe("PrecisionArithmeticEngine", () => {
     calc.calculate();
     assert.equal(calc.getDisplay(), "20");
   });
+
+  it("CASE-CALC-09: M+ adds active display value to memory register with precision arithmetic", () => {
+    const calc = new PrecisionArithmeticEngine();
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(calc.hasMemory(), false);
+
+    // Initial 10 into memory
+    calc.inputDigit("1");
+    calc.inputDigit("0");
+    calc.memoryAdd();
+    assert.equal(calc.getMemory(), 10);
+    assert.equal(calc.hasMemory(), true);
+    assert.equal(calc.getDisplay(), "10");
+
+    // Float precision accumulation: 0.1 then 0.2
+    calc.allClear();
+    calc.memoryClear();
+    calc.inputSequence(["0.1", "M+", "0.2", "M+"]);
+    assert.equal(calc.getMemory(), 0.3);
+    assert.equal(calc.hasMemory(), true);
+
+    // Guard during error state
+    calc.inputSequence(["1", "/", "0", "="]);
+    assert.equal(calc.getDisplay(), ERR_DIVISION_BY_ZERO);
+    calc.memoryAdd(); // Must be blocked
+    assert.equal(calc.getMemory(), 0.3);
+  });
+
+  it("CASE-CALC-10: M- subtracts active display value from memory register", () => {
+    const calc = new PrecisionArithmeticEngine();
+
+    calc.inputSequence(["10", "M+"]);
+    assert.equal(calc.getMemory(), 10);
+
+    calc.inputSequence(["4", "M-"]);
+    assert.equal(calc.getMemory(), 6);
+    assert.equal(calc.hasMemory(), true);
+
+    // Subtract remaining 6 -> returns to 0
+    calc.inputSequence(["6", "M-"]);
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(calc.hasMemory(), false);
+  });
+
+  it("CASE-CALC-11: MR recalls memory register value into active input buffer and allows immediate chained operations", () => {
+    const calc = new PrecisionArithmeticEngine();
+
+    calc.inputSequence(["42", "M+"]);
+    calc.allClear(); // Clears display/accumulator, preserves memory
+    assert.equal(calc.getDisplay(), "0");
+
+    // Recall memory
+    calc.memoryRecall();
+    assert.equal(calc.getDisplay(), "42");
+    assert.equal(calc.getMemory(), 42); // Memory preserved
+
+    // Immediate chained operation: 42 * 2 = 84
+    calc.inputOperator("*");
+    calc.inputDigit("2");
+    calc.calculate();
+    assert.equal(calc.getDisplay(), "84");
+    assert.equal(calc.getMemory(), 42);
+  });
+
+  it("CASE-CALC-12: MC resets memory register to 0", () => {
+    const calc = new PrecisionArithmeticEngine();
+
+    calc.inputSequence(["99", "M+"]);
+    assert.equal(calc.getMemory(), 99);
+    assert.equal(calc.hasMemory(), true);
+
+    calc.memoryClear();
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(calc.hasMemory(), false);
+    assert.equal(calc.getState().memory, 0);
+
+    // Verify token sequence handling
+    calc.inputSequence(["50", "M+", "MC"]);
+    assert.equal(calc.getMemory(), 0);
+    assert.equal(calc.hasMemory(), false);
+  });
+
+  it("CASE-CALC-13: Memory register persists across chained operations, sign toggles, and Clear Entry (C) / All Clear (AC)", () => {
+    const calc = new PrecisionArithmeticEngine();
+
+    calc.inputSequence(["100", "M+"]);
+    assert.equal(calc.getMemory(), 100);
+
+    // Perform independent calculations
+    calc.inputSequence(["5", "+", "5", "="]);
+    assert.equal(calc.getDisplay(), "10");
+    assert.equal(calc.getMemory(), 100);
+
+    // Clear Entry (C)
+    calc.inputDigit("9");
+    calc.clear();
+    assert.equal(calc.getDisplay(), "0");
+    assert.equal(calc.getMemory(), 100);
+
+    // All Clear (AC)
+    calc.allClear();
+    assert.equal(calc.getDisplay(), "0");
+    assert.equal(calc.getMemory(), 100);
+    assert.equal(calc.hasMemory(), true);
+
+    // Sign toggle on display does not alter stored memory
+    calc.inputDigit("7");
+    calc.toggleSign();
+    assert.equal(calc.getDisplay(), "-7");
+    assert.equal(calc.getMemory(), 100);
+
+    // Recalled memory
+    calc.memoryRecall();
+    assert.equal(calc.getDisplay(), "100");
+  });
 });
+

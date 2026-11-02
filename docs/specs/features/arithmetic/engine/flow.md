@@ -38,3 +38,19 @@ flowchart TD
   D -- C --> E["Reset buffer to zero and unlock"]
   D -- AC --> F["Reset entire engine state"]
 ```
+
+## FLW-CALC-03 Memory accumulation and recall flow
+
+```mermaid
+flowchart TD
+  A["User enters value"] --> B{"User presses M+, M-, MR, or MC"}
+  B -- "M+" --> C["Accumulate into memory register"]
+  B -- "M-" --> D["Subtract from memory register"]
+  B -- "MR" --> E["Recall memory into active buffer"]
+  B -- "MC" --> F["Reset memory register to zero"]
+  C --> G["Set isNewInput true and update display"]
+  D --> G
+  E --> G
+  F --> G
+```
+
