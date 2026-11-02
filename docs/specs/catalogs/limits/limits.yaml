@@ -5,3 +5,8 @@ entries:
     limit: 10
     code: LIM-CALC-DIGITS
     description: Maximum significant digits displayed in calculator buffer
+  - id: LIM-CALC-MIN-VIEWPORT
+    name: MinViewportWidth
+    limit: 320
+    code: LIM-CALC-MIN-VIEWPORT
+    description: Minimum mobile viewport width in pixels guaranteed without horizontal scroll overflow

@@ -1,3 +1,7 @@
 ---
 shells: []
-components: []
+components:
+  - id: stay-calc
+    tag: stay-calc
+    slice: component
+    description: Autonomous accessible web calculator custom element with Declarative Shadow DOM slot projection

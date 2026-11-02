@@ -7,3 +7,10 @@ entries:
     decided_date: "2026-11-02"
     slices: [engine]
     summary: Operations evaluate sequentially left-to-right on operator input without algebraic operator precedence.
+  - id: DEC-CALC-02
+    title: Autonomous custom element with Declarative Shadow DOM and native keyboard delegation
+    status: decided
+    decided_by: "human:maintainer"
+    decided_date: "2026-11-02"
+    slices: [component]
+    summary: Autonomous custom element <stay-calc> encapsulates interactive keypad and display in Declarative Shadow DOM with host/document keyboard listeners.
